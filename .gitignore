@@ -1,0 +1,26 @@
+# Visual Studio caches and local settings
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build products
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ipch/
+*.obj
+*.pdb
+*.ilk
+*.tlog
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Local model weights and generated experiment results
+*.onnx
+openGL_enhance/output/
+openGL_enhance/debug_left_aligned.png
