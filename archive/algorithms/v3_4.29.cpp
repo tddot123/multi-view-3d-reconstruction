@@ -333,7 +333,7 @@ Mat runDepthAnything(Mat& inputImg)
 
     static Ort::Session session(
         env,
-        L"model/depth_anything_v2_large.onnx",
+        L"models/depth_anything_v2_large.onnx",
         opts);
 
     Mat img;
@@ -509,7 +509,7 @@ static std::string makeDepthDebugPath(const std::string& inputImagePath, const c
     if (dot != std::string::npos)
         stem = stem.substr(0, dot);
 
-    return std::string("output/") + stem + "_depth_" + std::string(dirName) + ".png";
+    return std::string("outputs/") + stem + "_depth_" + std::string(dirName) + ".png";
 }
 
 ////////////////////////////////////////////////////////
@@ -1047,11 +1047,11 @@ void motion(int x, int y)
 
 int main(int argc, char** argv)
 {
-    const std::string frontPath = "input/front.png";
-    const std::string backPath = "input/back.png";
-    const std::string leftPath = "input/left.png";
-    const std::string rightPath = "input/right.png";
-    const std::string topPath = "input/top.png";
+    const std::string frontPath = "data/samples/multiview/front.png";
+    const std::string backPath = "data/samples/multiview/back.png";
+    const std::string leftPath = "data/samples/multiview/left.png";
+    const std::string rightPath = "data/samples/multiview/right.png";
+    const std::string topPath = "data/samples/multiview/top.png";
 
     frontImgRaw = imread(frontPath);
     backImgRaw = imread(backPath);

@@ -1,4 +1,4 @@
-﻿/*#include <GL/freeglut.h>
+/*#include <GL/freeglut.h>
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <iostream>
@@ -24,6 +24,9 @@ Mat depthLeft;
 Mat depthRight;
 Mat depthTop;
 
+bool hasRealBack = false;
+bool hasRealRight = false;
+
 ////////////////////////////////////////////////////////
 // ⭐比例 GRID（只新增）
 ////////////////////////////////////////////////////////
@@ -36,8 +39,9 @@ int GRID_Z;
 
 bool voxel[128][128][128];
 Vec3b voxelColor[128][128][128];
+unsigned char voxelVote[128][128][128];
 
-float cubeSize = 1.5f;
+float cubeSize = 2.0f;
 
 ////////////////////////////////////////////////////////
 // Camera（完全保留）
@@ -168,7 +172,8 @@ void alignImages()
         maskLeft,
         maskLeft,
         leftImg.size());
-
+    flip(leftImg, leftImg, 1);
+    flip(maskLeft, maskLeft, 1);
     int D = leftImg.cols;
 
     resize(
@@ -181,6 +186,10 @@ void alignImages()
         maskTop,
         topImg.size());
 
+    // 顶视图坐标系修正：逆时针旋转 90 度后再参与建模
+    rotate(topImg, topImg, ROTATE_90_COUNTERCLOCKWISE);
+    rotate(maskTop, maskTop, ROTATE_90_COUNTERCLOCKWISE);
+
     if (backImg.empty())
     {
         flip(frontImg, backImg, 1);
@@ -189,8 +198,9 @@ void alignImages()
 
     if (rightImg.empty())
     {
-        flip(leftImg, rightImg, 1);
-        flip(maskLeft, maskRight, 1);
+        // 左视图已做过一次左右翻转，这里直接拷贝给右视图，避免再次反向
+        rightImg = leftImg.clone();
+        maskRight = maskLeft.clone();
     }
 
     resize(backImg, backImg, Size(W, H));
@@ -207,23 +217,25 @@ void alignImages()
 // ⭐真正按图分辨率 + 自动缩放（最终推荐）
 //////////////////////////////////////////////////////
 
-    int MAX_RES = 256;
-    // 推荐范围：
-    // 192 → 普通电脑
-    // 256 → 推荐（大多数电脑可跑）
-    // 320 → 高性能电脑
+    const int MAX_GRID = 128;
+    // 体素数组是固定 128^3，统一按同一缩放因子保持 XYZ 原比例
 
     int maxDim =
         max({ W,H,D });
 
     float nscale =
         min(1.0f,
-            (float)MAX_RES /
+            (float)MAX_GRID /
             maxDim);
 
     GRID_X = int(W * nscale);
     GRID_Y = int(H * nscale);
     GRID_Z = int(D * nscale);
+
+    // 防止极端情况下某轴变成 0
+    GRID_X = max(1, GRID_X);
+    GRID_Y = max(1, GRID_Y);
+    GRID_Z = max(1, GRID_Z);
 
     cout << endl;
     cout << "=== Image Geometry ===" << endl;
@@ -244,15 +256,24 @@ void alignImages()
 
 Mat runDepthAnything(Mat& inputImg)
 {
+    if (inputImg.empty())
+        return Mat();
+
     static Ort::Env env(
         ORT_LOGGING_LEVEL_WARNING,
         "Depth");
 
     static Ort::SessionOptions opts;
+    static bool optsInit = false;
+    if (!optsInit)
+    {
+        opts.SetIntraOpNumThreads(1);
+        optsInit = true;
+    }
 
     static Ort::Session session(
         env,
-        L"depth_anything_v2_large.onnx",
+        L"models/depth_anything_v2_large.onnx",
         opts);
 
     Mat img;
@@ -317,10 +338,13 @@ Mat runDepthAnything(Mat& inputImg)
         CV_32F,
         data);
 
+    Mat safeDepth =
+        depth.clone();
+
     Mat depth8U;
 
     normalize(
-        depth,
+        safeDepth,
         depth8U,
         0,
         255,
@@ -335,7 +359,13 @@ Mat runDepthAnything(Mat& inputImg)
         depth8U,
         inputImg.size());
 
-    return depth8U;
+    return depth8U.clone();
+}
+
+static void saveDepthDebug(const char* filename, const Mat& depth8U)
+{
+    if (depth8U.empty()) return;
+    imwrite(filename, depth8U);
 }
 
 ////////////////////////////////////////////////////////
@@ -345,6 +375,7 @@ Mat runDepthAnything(Mat& inputImg)
 void initVoxel()
 {
     memset(voxel, false, sizeof(voxel));
+    memset(voxelVote, 0, sizeof(voxelVote));
 }
 
 void safeSetColor(int x, int y, int z, Vec3b c)
@@ -355,8 +386,70 @@ void safeSetColor(int x, int y, int z, Vec3b c)
         y >= GRID_Y ||
         z >= GRID_Z) return;
 
-    voxel[x][y][z] = true;
-    voxelColor[x][y][z] = c;
+    if (!voxel[x][y][z])
+    {
+        voxel[x][y][z] = true;
+        voxelColor[x][y][z] = c;
+    }
+    else
+    {
+        // 多视角命中同一体素时做简单均值，避免单视角颜色突变
+        Vec3b old = voxelColor[x][y][z];
+        voxelColor[x][y][z] = Vec3b(
+            (uchar)(((int)old[0] + (int)c[0]) / 2),
+            (uchar)(((int)old[1] + (int)c[1]) / 2),
+            (uchar)(((int)old[2] + (int)c[2]) / 2)
+        );
+    }
+
+    if (voxelVote[x][y][z] < 255)
+        voxelVote[x][y][z]++;
+}
+
+void finalizeVoxelByVote(unsigned char minVote)
+{
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+                if (voxel[x][y][z] && voxelVote[x][y][z] < minVote)
+                    voxel[x][y][z] = false;
+}
+
+void removeIsolatedVoxels(int minNeighborCount)
+{
+    static bool keep[128][128][128];
+    memset(keep, false, sizeof(keep));
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                if (!voxel[x][y][z]) continue;
+
+                int neighbors = 0;
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            if (dx == 0 && dy == 0 && dz == 0) continue;
+
+                            int nx = x + dx;
+                            int ny = y + dy;
+                            int nz = z + dz;
+
+                            if (nx < 0 || ny < 0 || nz < 0) continue;
+                            if (nx >= GRID_X || ny >= GRID_Y || nz >= GRID_Z) continue;
+                            if (voxel[nx][ny][nz]) neighbors++;
+                        }
+
+                if (neighbors >= minNeighborCount)
+                    keep[x][y][z] = true;
+            }
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+                voxel[x][y][z] = keep[x][y][z];
 }
 
 ////////////////////////////////////////////////////////
@@ -367,6 +460,22 @@ void buildFront()
 {
     int w = depthFront.cols;
     int h = depthFront.rows;
+
+    static int depthSum[128][128];
+    static int colorBSum[128][128];
+    static int colorGSum[128][128];
+    static int colorRSum[128][128];
+    static int hitCount[128][128];
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+        {
+            depthSum[x][y] = 0;
+            colorBSum[x][y] = 0;
+            colorGSum[x][y] = 0;
+            colorRSum[x][y] = 0;
+            hitCount[x][y] = 0;
+        }
 
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
@@ -379,12 +488,43 @@ void buildFront()
 
             int vx = x * GRID_X / w;
             int vy = (h - y - 1) * GRID_Y / h;
-            int vz = d * GRID_Z / 255;
 
             Vec3b c =
                 frontImg.at<Vec3b>(y, x);
 
-            safeSetColor(vx, vy, vz, c);
+            if (vx < 0 || vy < 0 ||
+                vx >= GRID_X || vy >= GRID_Y)
+                continue;
+
+            depthSum[vx][vy] += (int)d;
+            colorBSum[vx][vy] += (int)c[0];
+            colorGSum[vx][vy] += (int)c[1];
+            colorRSum[vx][vy] += (int)c[2];
+            hitCount[vx][vy]++;
+        }
+
+    // 关键：同一前视投影位置(vx,vy)只生成一个中心深度(vz)
+    // 并在z方向做小范围连续化，减少条纹和空洞
+    const int frontThickness = 2; // 可调：0更薄，2~3更连续
+    for (int vx = 0; vx < GRID_X; vx++)
+        for (int vy = 0; vy < GRID_Y; vy++)
+        {
+            int cnt = hitCount[vx][vy];
+            if (cnt <= 0) continue;
+
+            int avgDepth = depthSum[vx][vy] / cnt;
+            int vz = avgDepth * GRID_Z / 255;
+
+            Vec3b avgColor(
+                (uchar)(colorBSum[vx][vy] / cnt),
+                (uchar)(colorGSum[vx][vy] / cnt),
+                (uchar)(colorRSum[vx][vy] / cnt)
+            );
+
+            int z0 = max(0, vz - frontThickness);
+            int z1 = min(GRID_Z - 1, vz + frontThickness);
+            for (int zz = z0; zz <= z1; zz++)
+                safeSetColor(vx, vy, zz, avgColor);
         }
 }
 
@@ -392,6 +532,22 @@ void buildBack()
 {
     int w = depthBack.cols;
     int h = depthBack.rows;
+
+    static int depthSum[128][128];
+    static int colorBSum[128][128];
+    static int colorGSum[128][128];
+    static int colorRSum[128][128];
+    static int hitCount[128][128];
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+        {
+            depthSum[x][y] = 0;
+            colorBSum[x][y] = 0;
+            colorGSum[x][y] = 0;
+            colorRSum[x][y] = 0;
+            hitCount[x][y] = 0;
+        }
 
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
@@ -404,12 +560,41 @@ void buildBack()
 
             int vx = x * GRID_X / w;
             int vy = (h - y - 1) * GRID_Y / h;
-            int vz = GRID_Z - d * GRID_Z / 255 - 1;
 
             Vec3b c =
                 backImg.at<Vec3b>(y, x);
 
-            safeSetColor(vx, vy, vz, c);
+            if (vx < 0 || vy < 0 ||
+                vx >= GRID_X || vy >= GRID_Y)
+                continue;
+
+            depthSum[vx][vy] += (int)d;
+            colorBSum[vx][vy] += (int)c[0];
+            colorGSum[vx][vy] += (int)c[1];
+            colorRSum[vx][vy] += (int)c[2];
+            hitCount[vx][vy]++;
+        }
+
+    const int backThickness = 2;
+    for (int vx = 0; vx < GRID_X; vx++)
+        for (int vy = 0; vy < GRID_Y; vy++)
+        {
+            int cnt = hitCount[vx][vy];
+            if (cnt <= 0) continue;
+
+            int avgDepth = depthSum[vx][vy] / cnt;
+            int vz = GRID_Z - avgDepth * GRID_Z / 255 - 1;
+
+            Vec3b avgColor(
+                (uchar)(colorBSum[vx][vy] / cnt),
+                (uchar)(colorGSum[vx][vy] / cnt),
+                (uchar)(colorRSum[vx][vy] / cnt)
+            );
+
+            int z0 = max(0, vz - backThickness);
+            int z1 = min(GRID_Z - 1, vz + backThickness);
+            for (int zz = z0; zz <= z1; zz++)
+                safeSetColor(vx, vy, zz, avgColor);
         }
 }
 
@@ -417,6 +602,22 @@ void buildLeft()
 {
     int w = depthLeft.cols;
     int h = depthLeft.rows;
+
+    static int depthSum[128][128];
+    static int colorBSum[128][128];
+    static int colorGSum[128][128];
+    static int colorRSum[128][128];
+    static int hitCount[128][128];
+
+    for (int z = 0; z < GRID_Z; z++)
+        for (int y = 0; y < GRID_Y; y++)
+        {
+            depthSum[z][y] = 0;
+            colorBSum[z][y] = 0;
+            colorGSum[z][y] = 0;
+            colorRSum[z][y] = 0;
+            hitCount[z][y] = 0;
+        }
 
     for (int y = 0; y < h; y++)
         for (int z = 0; z < w; z++)
@@ -427,14 +628,43 @@ void buildLeft()
             uchar d =
                 depthLeft.at<uchar>(y, z);
 
-            int vx = d * GRID_X / 255;
             int vy = (h - y - 1) * GRID_Y / h;
             int vz = z * GRID_Z / w;
 
             Vec3b c =
                 leftImg.at<Vec3b>(y, z);
 
-            safeSetColor(vx, vy, vz, c);
+            if (vz < 0 || vy < 0 ||
+                vz >= GRID_Z || vy >= GRID_Y)
+                continue;
+
+            depthSum[vz][vy] += (int)d;
+            colorBSum[vz][vy] += (int)c[0];
+            colorGSum[vz][vy] += (int)c[1];
+            colorRSum[vz][vy] += (int)c[2];
+            hitCount[vz][vy]++;
+        }
+
+    const int leftThickness = 2;
+    for (int vz = 0; vz < GRID_Z; vz++)
+        for (int vy = 0; vy < GRID_Y; vy++)
+        {
+            int cnt = hitCount[vz][vy];
+            if (cnt <= 0) continue;
+
+            int avgDepth = depthSum[vz][vy] / cnt;
+            int vx = avgDepth * GRID_X / 255;
+
+            Vec3b avgColor(
+                (uchar)(colorBSum[vz][vy] / cnt),
+                (uchar)(colorGSum[vz][vy] / cnt),
+                (uchar)(colorRSum[vz][vy] / cnt)
+            );
+
+            int x0 = max(0, vx - leftThickness);
+            int x1 = min(GRID_X - 1, vx + leftThickness);
+            for (int xx = x0; xx <= x1; xx++)
+                safeSetColor(xx, vy, vz, avgColor);
         }
 }
 
@@ -442,6 +672,22 @@ void buildRight()
 {
     int w = depthRight.cols;
     int h = depthRight.rows;
+
+    static int depthSum[128][128];
+    static int colorBSum[128][128];
+    static int colorGSum[128][128];
+    static int colorRSum[128][128];
+    static int hitCount[128][128];
+
+    for (int z = 0; z < GRID_Z; z++)
+        for (int y = 0; y < GRID_Y; y++)
+        {
+            depthSum[z][y] = 0;
+            colorBSum[z][y] = 0;
+            colorGSum[z][y] = 0;
+            colorRSum[z][y] = 0;
+            hitCount[z][y] = 0;
+        }
 
     for (int y = 0; y < h; y++)
         for (int z = 0; z < w; z++)
@@ -452,14 +698,43 @@ void buildRight()
             uchar d =
                 depthRight.at<uchar>(y, z);
 
-            int vx = GRID_X - d * GRID_X / 255 - 1;
             int vy = (h - y - 1) * GRID_Y / h;
             int vz = z * GRID_Z / w;
 
             Vec3b c =
                 rightImg.at<Vec3b>(y, z);
 
-            safeSetColor(vx, vy, vz, c);
+            if (vz < 0 || vy < 0 ||
+                vz >= GRID_Z || vy >= GRID_Y)
+                continue;
+
+            depthSum[vz][vy] += (int)d;
+            colorBSum[vz][vy] += (int)c[0];
+            colorGSum[vz][vy] += (int)c[1];
+            colorRSum[vz][vy] += (int)c[2];
+            hitCount[vz][vy]++;
+        }
+
+    const int rightThickness = 2;
+    for (int vz = 0; vz < GRID_Z; vz++)
+        for (int vy = 0; vy < GRID_Y; vy++)
+        {
+            int cnt = hitCount[vz][vy];
+            if (cnt <= 0) continue;
+
+            int avgDepth = depthSum[vz][vy] / cnt;
+            int vx = GRID_X - avgDepth * GRID_X / 255 - 1;
+
+            Vec3b avgColor(
+                (uchar)(colorBSum[vz][vy] / cnt),
+                (uchar)(colorGSum[vz][vy] / cnt),
+                (uchar)(colorRSum[vz][vy] / cnt)
+            );
+
+            int x0 = max(0, vx - rightThickness);
+            int x1 = min(GRID_X - 1, vx + rightThickness);
+            for (int xx = x0; xx <= x1; xx++)
+                safeSetColor(xx, vy, vz, avgColor);
         }
 }
 
@@ -467,6 +742,22 @@ void buildTop()
 {
     int w = depthTop.cols;
     int h = depthTop.rows;
+
+    static int depthSum[128][128];
+    static int colorBSum[128][128];
+    static int colorGSum[128][128];
+    static int colorRSum[128][128];
+    static int hitCount[128][128];
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int z = 0; z < GRID_Z; z++)
+        {
+            depthSum[x][z] = 0;
+            colorBSum[x][z] = 0;
+            colorGSum[x][z] = 0;
+            colorRSum[x][z] = 0;
+            hitCount[x][z] = 0;
+        }
 
     for (int z = 0; z < h; z++)
         for (int x = 0; x < w; x++)
@@ -478,13 +769,45 @@ void buildTop()
                 depthTop.at<uchar>(z, x);
 
             int vx = x * GRID_X / w;
-            int vy = d * GRID_Y / 255;
             int vz = z * GRID_Z / h;
 
             Vec3b c =
                 topImg.at<Vec3b>(z, x);
 
-            safeSetColor(vx, vy, vz, c);
+            if (vx < 0 || vz < 0 ||
+                vx >= GRID_X || vz >= GRID_Z)
+                continue;
+
+            depthSum[vx][vz] += (int)d;
+            colorBSum[vx][vz] += (int)c[0];
+            colorGSum[vx][vz] += (int)c[1];
+            colorRSum[vx][vz] += (int)c[2];
+            hitCount[vx][vz]++;
+        }
+
+    const int topThickness = 2;
+    for (int vx = 0; vx < GRID_X; vx++)
+        for (int vz = 0; vz < GRID_Z; vz++)
+        {
+            int cnt = hitCount[vx][vz];
+            if (cnt <= 0) continue;
+
+            int avgDepth = depthSum[vx][vz] / cnt;
+            int vy0 = avgDepth * GRID_Y / 255;
+            // 顶端锚定不动，仅向下方向拉伸 1.5 倍
+            int yTop = GRID_Y - 1;
+            int vy = yTop - (int)((yTop - vy0) * 1.5f);
+            vy = min(GRID_Y - 1, max(0, vy));
+            Vec3b avgColor(
+                (uchar)(colorBSum[vx][vz] / cnt),
+                (uchar)(colorGSum[vx][vz] / cnt),
+                (uchar)(colorRSum[vx][vz] / cnt)
+            );
+
+            int y0 = max(0, vy - topThickness);
+            int y1 = min(GRID_Y - 1, vy + topThickness);
+            for (int yy = y0; yy <= y1; yy++)
+                safeSetColor(vx, yy, vz, avgColor);
         }
 }
 
@@ -493,7 +816,7 @@ void buildTop()
 ////////////////////////////////////////////////////////
 
 void drawCube(float x, float y, float z, float size) {
-    float s = size / 1.0f;
+    float s = size / 2.0f;
 
     glBegin(GL_QUADS);
 
@@ -646,13 +969,15 @@ void motion(int x, int y)
 
 int main(int argc, char** argv)
 {
-    frontImg = imread("six/front.png");
-    backImg = imread("six/back.png");
+    frontImg = imread("data/samples/multiview/front.png");
+    backImg = imread("data/samples/multiview/back.png");
+    hasRealBack = !backImg.empty();
 
-    leftImg = imread("six/left.png");
-    rightImg = imread("six/right.png");
+    leftImg = imread("data/samples/multiview/left.png");
+    rightImg = imread("data/samples/multiview/right.png");
+    hasRealRight = !rightImg.empty();
 
-    topImg = imread("six/top.png");
+    topImg = imread("data/samples/multiview/top.png");
 
     if (frontImg.empty() ||
         leftImg.empty() ||
@@ -670,13 +995,27 @@ int main(int argc, char** argv)
     depthRight = runDepthAnything(rightImg);
     depthTop = runDepthAnything(topImg);
 
+    // 保存5张深度图到当前目录（便于观察）
+    saveDepthDebug("depth/depth_front.png", depthFront);
+    saveDepthDebug("depth/depth_back.png", depthBack);
+    saveDepthDebug("depth/depth_left.png", depthLeft);
+    saveDepthDebug("depth/depth_right.png", depthRight);
+    saveDepthDebug("depth/depth_top.png", depthTop);
+
     initVoxel();
 
-    // buildFront();
-    // buildBack();
-     //buildLeft();
-    // buildRight();
+    buildFront();
+    buildLeft();
     buildTop();
+
+    
+    buildBack();
+
+    
+   buildRight();
+
+    // 清理孤立噪声点（值越大去噪越强）
+    removeIsolatedVoxels(4);
 
     cout << "Voxel Build Done" << endl;
 

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{41457c33-0fd8-4d0c-9a55-20790496ef8c}</ProjectGuid>
+    <RootNamespace>MultiView3DReconstruction</RootNamespace>
+    <ProjectName>multi-view-3d-reconstruction</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <RepoRoot>$(MSBuildThisFileDirectory)..\..\</RepoRoot>
+    <ReconstructionVersion Condition="'$(ReconstructionVersion)'==''">v5</ReconstructionVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(RepoRoot)config\dependencies.props" />
+  <PropertyGroup>
+    <OutDir>$(RepoRoot)build\bin\$(Platform)\$(Configuration)\$(ReconstructionVersion)\</OutDir>
+    <IntDir>$(RepoRoot)build\obj\$(Platform)\$(Configuration)\$(ReconstructionVersion)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(RepoRoot)</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link><SubSystem>Console</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\reconstruction\v5_confidence.cpp"><ExcludedFromBuild Condition="'$(ReconstructionVersion)'!='v5'">true</ExcludedFromBuild></ClCompile>
+    <ClCompile Include="..\..\src\legacy\new_try.cpp"><ExcludedFromBuild Condition="'$(ReconstructionVersion)'!='v4'">true</ExcludedFromBuild></ClCompile>
+    <None Include="..\..\archive\algorithms\*.cpp" />
+    <None Include="..\..\experiments\single_view\*.cpp" />
+    <None Include="..\..\experiments\multiview\*.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CheckBuildSelection" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Platform)'!='x64'" Text="Only x64 dependencies are supported." />
+    <Error Condition="'$(ReconstructionVersion)'!='v4' And '$(ReconstructionVersion)'!='v5'" Text="ReconstructionVersion must be v4 or v5 (algorithm versions, independent of formal releases)." />
+  </Target>
+  <Target Name="PrepareRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <RuntimeDll Include="$(RuntimeDir)freeglut.dll;$(RuntimeDir)opencv_world$(OpenCVVersion)$(OpenCVDebugSuffix).dll;$(RuntimeDir)onnxruntime.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RuntimeDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <MakeDir Directories="$(RepoRoot)outputs\legacy" />
+  </Target>
+</Project>

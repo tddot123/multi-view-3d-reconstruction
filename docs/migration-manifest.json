@@ -1,0 +1,923 @@
+{
+  "v1_commit": "a32e2056d7f8a0f4b4aa3c27a774e0a72d8821c5",
+  "files": [
+    {
+      "v1_path": ".gitignore",
+      "v2_path": ".gitignore",
+      "v1_sha256": "312505f183936f17fa64abacb5e9ac0ec40c2bdf6041a7a377274d1b75a8d719",
+      "v2_sha256": "6690f22325ca1c03add20e7cbc63b2c76194e9711da1877f40c671b9f8da1659",
+      "v1_git_sha256": "312505f183936f17fa64abacb5e9ac0ec40c2bdf6041a7a377274d1b75a8d719"
+    },
+    {
+      "v1_path": "CppProperties.json",
+      "v2_path": "CppProperties.json",
+      "v1_sha256": "285f0fdb3422cdc6227c3abb149d521acd810d8dac6e452f8e4ba1a2b93f82bd",
+      "v2_sha256": "7375deb1a102040148ed74970ec37ae8d856b121341dfa327849755987a18a41",
+      "v1_git_sha256": "7375deb1a102040148ed74970ec37ae8d856b121341dfa327849755987a18a41"
+    },
+    {
+      "v1_path": "README.md",
+      "v2_path": "README.md",
+      "v1_sha256": "e14ff13e19a8cf2e81cbb39e8c94ef531bd330cb24730eebd71e32502bf417cb",
+      "v2_sha256": "b0562543a3e62df3792d340d9fb09fa88b86d77195d885694259b3310a0e5139",
+      "v1_git_sha256": "e14ff13e19a8cf2e81cbb39e8c94ef531bd330cb24730eebd71e32502bf417cb"
+    },
+    {
+      "v1_path": "multi-view-3d-reconstruction.sln",
+      "v2_path": "multi-view-3d-reconstruction.sln",
+      "v1_sha256": "64e83b2252d9e5240a32a170b9f682630bac806a3edb0892b5235522d65168e7",
+      "v2_sha256": "ee0b6401b40f42f6cce3bd2af45660a6959b26ddb842add3e233cd274d96c426",
+      "v1_git_sha256": "063d299e0f76401b930b546ebf06f6158f27891db49c9b49d85ccab9c17466fc"
+    },
+    {
+      "v1_path": "openGL_enhance/V5_NOTES.md",
+      "v2_path": "docs/usage.md",
+      "v1_sha256": "581860ae409cf2799d26119ba5736db51dfb41d3be2c3807e83fc5c49f636a9a",
+      "v2_sha256": "e36d1d9eaf53a18b26b300fc78363342bb853fb0cfd7527a836944b7ed12758d",
+      "v1_git_sha256": "581860ae409cf2799d26119ba5736db51dfb41d3be2c3807e83fc5c49f636a9a"
+    },
+    {
+      "v1_path": "openGL_enhance/car_box.cpp",
+      "v2_path": "experiments/multiview/car_box.cpp",
+      "v1_sha256": "8de2ee4bab4e4dff322db1f0fd7c235d40348fa7a9059ec740d2ce5e24bdedbe",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "a466edd106727ab9552a2f4e3fc6f26638b128fc85450475e088370c8fedcb5c",
+      "v1_git_sha256": "1806212f39b32287d18722820da8c6d9cfd7e44154417869be8827e23c56345e"
+    },
+    {
+      "v1_path": "openGL_enhance/copy.cpp",
+      "v2_path": "experiments/multiview/copy.cpp",
+      "v1_sha256": "c873a4c6214ec2e5b7f49102908c620aae9e040dfc9f0a8a62161535101aef03",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "6bae686f3cead1d4e3f4e4eed0773ef4a36a16987e482e0405b5399127cc0ca1",
+      "v1_git_sha256": "7c36c2589135db3e2fad677d7ebdaddb3e056c9c4dfe4c89a0b059dcc06790ec"
+    },
+    {
+      "v1_path": "openGL_enhance/front_mesh.cpp",
+      "v2_path": "experiments/single_view/front_mesh.cpp",
+      "v1_sha256": "982205445fb23144c46396b038c91e06a409c801d4c6046e485ebea6facaeaf6",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "cad81ad8a841dbf63206aa11b0640e94c67972f13a453c7190b90d3e1bc8c041",
+      "v1_git_sha256": "4e3b638ea1d50d3b4a758181800d078c586620f482646772d09ef5c7c3e778d3"
+    },
+    {
+      "v1_path": "openGL_enhance/front_mesh_colordepth.cpp",
+      "v2_path": "experiments/single_view/front_mesh_colordepth.cpp",
+      "v1_sha256": "23edd9c1edcce6d86d5cc1dcb36b532f4913deffd837a8f47f95e095f5b0f81e",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "5613555e60620b6310fab017d421d0576c850caa0a42b9bf9caaaaae8ff94bb8",
+      "v1_git_sha256": "d9629c7f46dfc126bc679110fe2c0d7059f42b78ff6cb73223f591c4b6812ee7"
+    },
+    {
+      "v1_path": "openGL_enhance/front_pixel.cpp",
+      "v2_path": "experiments/single_view/front_pixel.cpp",
+      "v1_sha256": "5cf7c109144fbf905667b4778196bdfc8487c0bf61a4ff46da7c8254ef120629",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "849cd40ab91b7200548b0979c53e7c55a95f26776f0396085329b7633b1089fc",
+      "v1_git_sha256": "1415ae939d428d711b7b8a5fefeb98aec2f2b5c954cc6b9456f5e7445a99202b"
+    },
+    {
+      "v1_path": "openGL_enhance/front_success.cpp",
+      "v2_path": "experiments/single_view/front_success.cpp",
+      "v1_sha256": "e1dd39ae0b2cb360967cd0e11040a1ec5d089f7cb2c635b405bc1dd4cc694f05",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "9f022a3c016316abd28c9cea8c8758e79cd8e1ae8f18207ae77a9897619e0970",
+      "v1_git_sha256": "f80fe2f202c36b35f6cbc7a81bbd84fbbad92ec7ecb82bf01adb12e7310ae529"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b.png",
+      "v2_path": "data/samples/multiview/b.png",
+      "v1_sha256": "e6c0ceb7a358a32812f770f9d02f8e45fe2c839c419cbe9a12ef36f172596d3f",
+      "v2_sha256": "e6c0ceb7a358a32812f770f9d02f8e45fe2c839c419cbe9a12ef36f172596d3f",
+      "v1_git_sha256": "e6c0ceb7a358a32812f770f9d02f8e45fe2c839c419cbe9a12ef36f172596d3f"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b01.png",
+      "v2_path": "data/samples/multiview/b01.png",
+      "v1_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v2_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v1_git_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b01_blue.png",
+      "v2_path": "data/samples/multiview/b01_blue.png",
+      "v1_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v2_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v1_git_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b01_edge.png",
+      "v2_path": "data/samples/multiview/b01_edge.png",
+      "v1_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v2_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v1_git_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b01_red.png",
+      "v2_path": "data/samples/multiview/b01_red.png",
+      "v1_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v2_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v1_git_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b02.png",
+      "v2_path": "data/samples/multiview/b02.png",
+      "v1_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v2_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v1_git_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b02_edge.png",
+      "v2_path": "data/samples/multiview/b02_edge.png",
+      "v1_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v2_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v1_git_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b02_pure.png",
+      "v2_path": "data/samples/multiview/b02_pure.png",
+      "v1_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v2_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v1_git_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b03.png",
+      "v2_path": "data/samples/multiview/b03.png",
+      "v1_sha256": "ee2b1ae046282e0212208865fe86305a159c7dbb6a0bd72fa67ebb02142588d3",
+      "v2_sha256": "ee2b1ae046282e0212208865fe86305a159c7dbb6a0bd72fa67ebb02142588d3",
+      "v1_git_sha256": "ee2b1ae046282e0212208865fe86305a159c7dbb6a0bd72fa67ebb02142588d3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b04.png",
+      "v2_path": "data/samples/multiview/b04.png",
+      "v1_sha256": "b35c3090d59307d7664bb2947b388f89c15d2e30708029a005829e16aec41fc4",
+      "v2_sha256": "b35c3090d59307d7664bb2947b388f89c15d2e30708029a005829e16aec41fc4",
+      "v1_git_sha256": "b35c3090d59307d7664bb2947b388f89c15d2e30708029a005829e16aec41fc4"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b05.png",
+      "v2_path": "data/samples/multiview/b05.png",
+      "v1_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v2_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v1_git_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b06.png",
+      "v2_path": "data/samples/multiview/b06.png",
+      "v1_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab",
+      "v2_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab",
+      "v1_git_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b07.png",
+      "v2_path": "data/samples/multiview/b07.png",
+      "v1_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce",
+      "v2_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce",
+      "v1_git_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b08.png",
+      "v2_path": "data/samples/multiview/b08.png",
+      "v1_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v2_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v1_git_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b09.png",
+      "v2_path": "data/samples/multiview/b09.png",
+      "v1_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee",
+      "v2_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee",
+      "v1_git_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b1.png",
+      "v2_path": "data/samples/multiview/b1.png",
+      "v1_sha256": "6ed03886773154e5c739d69f0ee4d2b963973e5b7fdd8f466891986be48f7213",
+      "v2_sha256": "6ed03886773154e5c739d69f0ee4d2b963973e5b7fdd8f466891986be48f7213",
+      "v1_git_sha256": "6ed03886773154e5c739d69f0ee4d2b963973e5b7fdd8f466891986be48f7213"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b10.png",
+      "v2_path": "data/samples/multiview/b10.png",
+      "v1_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v2_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v1_git_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b11.png",
+      "v2_path": "data/samples/multiview/b11.png",
+      "v1_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v2_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v1_git_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/b2.png",
+      "v2_path": "data/samples/multiview/b2.png",
+      "v1_sha256": "e3d9159ac63802e4c25900895df8f961dd14b027932d1f0a0d1ca2f8e5610bbd",
+      "v2_sha256": "e3d9159ac63802e4c25900895df8f961dd14b027932d1f0a0d1ca2f8e5610bbd",
+      "v1_git_sha256": "e3d9159ac63802e4c25900895df8f961dd14b027932d1f0a0d1ca2f8e5610bbd"
+    },
+    {
+      "v1_path": "openGL_enhance/input/back.png",
+      "v2_path": "data/samples/multiview/back.png",
+      "v1_sha256": "12d1caa443a985328e1600dbcacfea24d2a61dc4efd637e859dc1623b0266b6c",
+      "v2_sha256": "12d1caa443a985328e1600dbcacfea24d2a61dc4efd637e859dc1623b0266b6c",
+      "v1_git_sha256": "12d1caa443a985328e1600dbcacfea24d2a61dc4efd637e859dc1623b0266b6c"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f.png",
+      "v2_path": "data/samples/multiview/f.png",
+      "v1_sha256": "22a266d222eb2d7cade23381746e64abf0f878a28538a4d2cca17f1cc4b85592",
+      "v2_sha256": "22a266d222eb2d7cade23381746e64abf0f878a28538a4d2cca17f1cc4b85592",
+      "v1_git_sha256": "22a266d222eb2d7cade23381746e64abf0f878a28538a4d2cca17f1cc4b85592"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f01.png",
+      "v2_path": "data/samples/multiview/f01.png",
+      "v1_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v2_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v1_git_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f01_blue.png",
+      "v2_path": "data/samples/multiview/f01_blue.png",
+      "v1_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v2_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v1_git_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f01_edge.png",
+      "v2_path": "data/samples/multiview/f01_edge.png",
+      "v1_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v2_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v1_git_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f01_red.png",
+      "v2_path": "data/samples/multiview/f01_red.png",
+      "v1_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v2_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v1_git_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f02.png",
+      "v2_path": "data/samples/multiview/f02.png",
+      "v1_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v2_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v1_git_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f02_edge.png",
+      "v2_path": "data/samples/multiview/f02_edge.png",
+      "v1_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v2_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v1_git_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f02_pure.png",
+      "v2_path": "data/samples/multiview/f02_pure.png",
+      "v1_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v2_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v1_git_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f03.png",
+      "v2_path": "data/samples/multiview/f03.png",
+      "v1_sha256": "960d0d78d539d0fe737f0384cdf1778b42f45ce5b2d571f0eab02db606994c51",
+      "v2_sha256": "960d0d78d539d0fe737f0384cdf1778b42f45ce5b2d571f0eab02db606994c51",
+      "v1_git_sha256": "960d0d78d539d0fe737f0384cdf1778b42f45ce5b2d571f0eab02db606994c51"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f04.png",
+      "v2_path": "data/samples/multiview/f04.png",
+      "v1_sha256": "ff43d582f83f38083a1d199b6305772f4581e73b9323de7af546f19df3eb0405",
+      "v2_sha256": "ff43d582f83f38083a1d199b6305772f4581e73b9323de7af546f19df3eb0405",
+      "v1_git_sha256": "ff43d582f83f38083a1d199b6305772f4581e73b9323de7af546f19df3eb0405"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f05.png",
+      "v2_path": "data/samples/multiview/f05.png",
+      "v1_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v2_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v1_git_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f06.png",
+      "v2_path": "data/samples/multiview/f06.png",
+      "v1_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab",
+      "v2_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab",
+      "v1_git_sha256": "082a94d282077dc8281e022be88fda7a2b562bf27c49a5b40c2a20d835b106ab"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f07.png",
+      "v2_path": "data/samples/multiview/f07.png",
+      "v1_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce",
+      "v2_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce",
+      "v1_git_sha256": "04727e21ee6c1407531d8eecfdfba6cb2de7105e4ffc8d2f912739e2fcd862ce"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f08.png",
+      "v2_path": "data/samples/multiview/f08.png",
+      "v1_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v2_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v1_git_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f09.png",
+      "v2_path": "data/samples/multiview/f09.png",
+      "v1_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee",
+      "v2_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee",
+      "v1_git_sha256": "9156456e003088cc33f5dca415f2474b875ecc62960fef2a3e7ad2139faff1ee"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f1.png",
+      "v2_path": "data/samples/multiview/f1.png",
+      "v1_sha256": "146eb0e31efc6c033f1097fce9cafae5a61c472f3960e6803fd59f50468bd405",
+      "v2_sha256": "146eb0e31efc6c033f1097fce9cafae5a61c472f3960e6803fd59f50468bd405",
+      "v1_git_sha256": "146eb0e31efc6c033f1097fce9cafae5a61c472f3960e6803fd59f50468bd405"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f10.png",
+      "v2_path": "data/samples/multiview/f10.png",
+      "v1_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v2_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v1_git_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f11.png",
+      "v2_path": "data/samples/multiview/f11.png",
+      "v1_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v2_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v1_git_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/f2.png",
+      "v2_path": "data/samples/multiview/f2.png",
+      "v1_sha256": "10c5fe2cced20390e929c492a34aecbf289722e9cbcd9c01a04c4fce6f4c47f6",
+      "v2_sha256": "10c5fe2cced20390e929c492a34aecbf289722e9cbcd9c01a04c4fce6f4c47f6",
+      "v1_git_sha256": "10c5fe2cced20390e929c492a34aecbf289722e9cbcd9c01a04c4fce6f4c47f6"
+    },
+    {
+      "v1_path": "openGL_enhance/input/front.png",
+      "v2_path": "data/samples/multiview/front.png",
+      "v1_sha256": "778e1fc38340b16599995c5758ed92bbecde43fa07489fadb8f2ea3d92a3fc0f",
+      "v2_sha256": "778e1fc38340b16599995c5758ed92bbecde43fa07489fadb8f2ea3d92a3fc0f",
+      "v1_git_sha256": "778e1fc38340b16599995c5758ed92bbecde43fa07489fadb8f2ea3d92a3fc0f"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l.png",
+      "v2_path": "data/samples/multiview/l.png",
+      "v1_sha256": "5ac4ad46e1fe17161bcb9a1fb0875929ac29cbef5e1060f34997c212fa9a7650",
+      "v2_sha256": "5ac4ad46e1fe17161bcb9a1fb0875929ac29cbef5e1060f34997c212fa9a7650",
+      "v1_git_sha256": "5ac4ad46e1fe17161bcb9a1fb0875929ac29cbef5e1060f34997c212fa9a7650"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l01.png",
+      "v2_path": "data/samples/multiview/l01.png",
+      "v1_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v2_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v1_git_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l01_blue.png",
+      "v2_path": "data/samples/multiview/l01_blue.png",
+      "v1_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v2_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v1_git_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l01_edge.png",
+      "v2_path": "data/samples/multiview/l01_edge.png",
+      "v1_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v2_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v1_git_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l01_red.png",
+      "v2_path": "data/samples/multiview/l01_red.png",
+      "v1_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v2_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v1_git_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l02.png",
+      "v2_path": "data/samples/multiview/l02.png",
+      "v1_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v2_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v1_git_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l02_edge.png",
+      "v2_path": "data/samples/multiview/l02_edge.png",
+      "v1_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v2_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v1_git_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l02_pure.png",
+      "v2_path": "data/samples/multiview/l02_pure.png",
+      "v1_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v2_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v1_git_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l03.png",
+      "v2_path": "data/samples/multiview/l03.png",
+      "v1_sha256": "8912e61c89152c9942ae6b4b0686ba4f53c8d343fdb96404232e9b9ae5bb98be",
+      "v2_sha256": "8912e61c89152c9942ae6b4b0686ba4f53c8d343fdb96404232e9b9ae5bb98be",
+      "v1_git_sha256": "8912e61c89152c9942ae6b4b0686ba4f53c8d343fdb96404232e9b9ae5bb98be"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l04.png",
+      "v2_path": "data/samples/multiview/l04.png",
+      "v1_sha256": "86daf9a3deb5d9b5f91f09fc7daa842a8fb7a37f164a04632dab25ad7dcc6147",
+      "v2_sha256": "86daf9a3deb5d9b5f91f09fc7daa842a8fb7a37f164a04632dab25ad7dcc6147",
+      "v1_git_sha256": "86daf9a3deb5d9b5f91f09fc7daa842a8fb7a37f164a04632dab25ad7dcc6147"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l05.png",
+      "v2_path": "data/samples/multiview/l05.png",
+      "v1_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v2_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v1_git_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l06.png",
+      "v2_path": "data/samples/multiview/l06.png",
+      "v1_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864",
+      "v2_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864",
+      "v1_git_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l07.png",
+      "v2_path": "data/samples/multiview/l07.png",
+      "v1_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03",
+      "v2_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03",
+      "v1_git_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l08.png",
+      "v2_path": "data/samples/multiview/l08.png",
+      "v1_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v2_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v1_git_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l09.png",
+      "v2_path": "data/samples/multiview/l09.png",
+      "v1_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc",
+      "v2_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc",
+      "v1_git_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l1.png",
+      "v2_path": "data/samples/multiview/l1.png",
+      "v1_sha256": "f634f765f3a761e9a042cba4625192ce6bc8a59d9a06fecc495dab174cb90ab6",
+      "v2_sha256": "f634f765f3a761e9a042cba4625192ce6bc8a59d9a06fecc495dab174cb90ab6",
+      "v1_git_sha256": "f634f765f3a761e9a042cba4625192ce6bc8a59d9a06fecc495dab174cb90ab6"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l10.png",
+      "v2_path": "data/samples/multiview/l10.png",
+      "v1_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v2_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v1_git_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l11.png",
+      "v2_path": "data/samples/multiview/l11.png",
+      "v1_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v2_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v1_git_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/l2.png",
+      "v2_path": "data/samples/multiview/l2.png",
+      "v1_sha256": "8a2fe609651e4dd978b6618c662cbac44765674a6359fe265c02507f57cedc59",
+      "v2_sha256": "8a2fe609651e4dd978b6618c662cbac44765674a6359fe265c02507f57cedc59",
+      "v1_git_sha256": "8a2fe609651e4dd978b6618c662cbac44765674a6359fe265c02507f57cedc59"
+    },
+    {
+      "v1_path": "openGL_enhance/input/left.png",
+      "v2_path": "data/samples/multiview/left.png",
+      "v1_sha256": "0ba288cca856c92eeb38296d459517e0114415e51cd110e6e63a4618cb8661b1",
+      "v2_sha256": "0ba288cca856c92eeb38296d459517e0114415e51cd110e6e63a4618cb8661b1",
+      "v1_git_sha256": "0ba288cca856c92eeb38296d459517e0114415e51cd110e6e63a4618cb8661b1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r.png",
+      "v2_path": "data/samples/multiview/r.png",
+      "v1_sha256": "078e6e1e3c71acde1baf3476345a312db861f38e249fe474a9751d00f5dce07d",
+      "v2_sha256": "078e6e1e3c71acde1baf3476345a312db861f38e249fe474a9751d00f5dce07d",
+      "v1_git_sha256": "078e6e1e3c71acde1baf3476345a312db861f38e249fe474a9751d00f5dce07d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r01.png",
+      "v2_path": "data/samples/multiview/r01.png",
+      "v1_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v2_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v1_git_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r01_blue.png",
+      "v2_path": "data/samples/multiview/r01_blue.png",
+      "v1_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v2_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v1_git_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r01_edge.png",
+      "v2_path": "data/samples/multiview/r01_edge.png",
+      "v1_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v2_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v1_git_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r01_red.png",
+      "v2_path": "data/samples/multiview/r01_red.png",
+      "v1_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v2_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v1_git_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r02.png",
+      "v2_path": "data/samples/multiview/r02.png",
+      "v1_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v2_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v1_git_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r02_edge.png",
+      "v2_path": "data/samples/multiview/r02_edge.png",
+      "v1_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v2_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v1_git_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r02_pure.png",
+      "v2_path": "data/samples/multiview/r02_pure.png",
+      "v1_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v2_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v1_git_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r03.png",
+      "v2_path": "data/samples/multiview/r03.png",
+      "v1_sha256": "9f09a8680e921da4019178205cc2632669a000420560c384b12cc8a5716cd8d7",
+      "v2_sha256": "9f09a8680e921da4019178205cc2632669a000420560c384b12cc8a5716cd8d7",
+      "v1_git_sha256": "9f09a8680e921da4019178205cc2632669a000420560c384b12cc8a5716cd8d7"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r04.png",
+      "v2_path": "data/samples/multiview/r04.png",
+      "v1_sha256": "5b681c2842b5810850d205ce513f13f5f43058b8dda4b08fa90724eaca9c055d",
+      "v2_sha256": "5b681c2842b5810850d205ce513f13f5f43058b8dda4b08fa90724eaca9c055d",
+      "v1_git_sha256": "5b681c2842b5810850d205ce513f13f5f43058b8dda4b08fa90724eaca9c055d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r05.png",
+      "v2_path": "data/samples/multiview/r05.png",
+      "v1_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v2_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8",
+      "v1_git_sha256": "cd2fcca11aed17a825e15f566c1f9400410fdc17185f2bee3ecd22bc290b4ea8"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r06.png",
+      "v2_path": "data/samples/multiview/r06.png",
+      "v1_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864",
+      "v2_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864",
+      "v1_git_sha256": "bb1857e44f3e7bbf2c056262cf46f2defe2f63dbaeef8310e01a1ec56eb84864"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r07.png",
+      "v2_path": "data/samples/multiview/r07.png",
+      "v1_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03",
+      "v2_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03",
+      "v1_git_sha256": "68c1045c7ddd6f21b5f9a43cbade68086ef93afaa56baf11708294c55b1aae03"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r08.png",
+      "v2_path": "data/samples/multiview/r08.png",
+      "v1_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v2_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a",
+      "v1_git_sha256": "0eaed6fbf855630332620d26cc20c6249c9dc81b2c8490ab05288f58a065781a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r09.png",
+      "v2_path": "data/samples/multiview/r09.png",
+      "v1_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc",
+      "v2_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc",
+      "v1_git_sha256": "6ba5248c125ab5c11e2cfa24a1faee740ac0406bb4e938f592153e7f883bc8cc"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r10.png",
+      "v2_path": "data/samples/multiview/r10.png",
+      "v1_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v2_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v1_git_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r11.png",
+      "v2_path": "data/samples/multiview/r11.png",
+      "v1_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v2_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v1_git_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/r2.png",
+      "v2_path": "data/samples/multiview/r2.png",
+      "v1_sha256": "3ab8a054db9c0a3e55fbefd8951f1fc3bb6f78f82b2b48e6a92643c65bf00930",
+      "v2_sha256": "3ab8a054db9c0a3e55fbefd8951f1fc3bb6f78f82b2b48e6a92643c65bf00930",
+      "v1_git_sha256": "3ab8a054db9c0a3e55fbefd8951f1fc3bb6f78f82b2b48e6a92643c65bf00930"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t.png",
+      "v2_path": "data/samples/multiview/t.png",
+      "v1_sha256": "62705f4970083fa76ccb467a19e4a35c7fd1cac31012781af3d08dd077ed865a",
+      "v2_sha256": "62705f4970083fa76ccb467a19e4a35c7fd1cac31012781af3d08dd077ed865a",
+      "v1_git_sha256": "62705f4970083fa76ccb467a19e4a35c7fd1cac31012781af3d08dd077ed865a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t01.png",
+      "v2_path": "data/samples/multiview/t01.png",
+      "v1_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v2_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096",
+      "v1_git_sha256": "5fc60b3d1aeb5617db586bc7df5e157cae5b812a80630d67b8ede464cde93096"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t01_blue.png",
+      "v2_path": "data/samples/multiview/t01_blue.png",
+      "v1_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v2_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129",
+      "v1_git_sha256": "8a3d2be84c50351b218cadb7e31dc0f1c211ed532da579e16196f82c9a5ca129"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t01_edge.png",
+      "v2_path": "data/samples/multiview/t01_edge.png",
+      "v1_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v2_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3",
+      "v1_git_sha256": "514c53bc2985ad3a10e05f33c3e3e3dea80da87c604f2fc2309e39c632279cf3"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t01_red.png",
+      "v2_path": "data/samples/multiview/t01_red.png",
+      "v1_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v2_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d",
+      "v1_git_sha256": "eb6facb4cc720579c16c7626b9edce5e2430eade017258ac03338d7b87ad011d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t02.png",
+      "v2_path": "data/samples/multiview/t02.png",
+      "v1_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v2_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1",
+      "v1_git_sha256": "7404513338b3335e1b0a60f277d575ede216e7d542f503102b08a260ad8ccfd1"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t02_edge.png",
+      "v2_path": "data/samples/multiview/t02_edge.png",
+      "v1_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v2_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589",
+      "v1_git_sha256": "19f5858ee528a0f073f0dfa7928e1ff402115971a78d5384357f2f98443c8589"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t02_pure.png",
+      "v2_path": "data/samples/multiview/t02_pure.png",
+      "v1_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v2_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91",
+      "v1_git_sha256": "ead7b453a3188f76f75e311a626ab61e4c366af5f1cac6791879dc9694c49d91"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t03.png",
+      "v2_path": "data/samples/multiview/t03.png",
+      "v1_sha256": "7c211e5d8776277b16ad226c95d98152fc8009dfdeb1a23132695f1730d48254",
+      "v2_sha256": "7c211e5d8776277b16ad226c95d98152fc8009dfdeb1a23132695f1730d48254",
+      "v1_git_sha256": "7c211e5d8776277b16ad226c95d98152fc8009dfdeb1a23132695f1730d48254"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t04.png",
+      "v2_path": "data/samples/multiview/t04.png",
+      "v1_sha256": "b738bb5ca50000978a6e48529342d501aa1eaf6b80f355407fbe4dfc6c9c70d9",
+      "v2_sha256": "b738bb5ca50000978a6e48529342d501aa1eaf6b80f355407fbe4dfc6c9c70d9",
+      "v1_git_sha256": "b738bb5ca50000978a6e48529342d501aa1eaf6b80f355407fbe4dfc6c9c70d9"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t05.png",
+      "v2_path": "data/samples/multiview/t05.png",
+      "v1_sha256": "63ccf89969ad708a4674aeb9c792103717a88908a4cfcd079ccbbe0ecacfe8dd",
+      "v2_sha256": "63ccf89969ad708a4674aeb9c792103717a88908a4cfcd079ccbbe0ecacfe8dd",
+      "v1_git_sha256": "63ccf89969ad708a4674aeb9c792103717a88908a4cfcd079ccbbe0ecacfe8dd"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t06.png",
+      "v2_path": "data/samples/multiview/t06.png",
+      "v1_sha256": "4e36024a3b58b3eb67ce388df3fb6dff4ad47c47e5ff963287c795537fd8f758",
+      "v2_sha256": "4e36024a3b58b3eb67ce388df3fb6dff4ad47c47e5ff963287c795537fd8f758",
+      "v1_git_sha256": "4e36024a3b58b3eb67ce388df3fb6dff4ad47c47e5ff963287c795537fd8f758"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t07.png",
+      "v2_path": "data/samples/multiview/t07.png",
+      "v1_sha256": "2ecee13ca383533a989f841da4494be0556d715ee8ab5869e13e97b0b1e339a0",
+      "v2_sha256": "2ecee13ca383533a989f841da4494be0556d715ee8ab5869e13e97b0b1e339a0",
+      "v1_git_sha256": "2ecee13ca383533a989f841da4494be0556d715ee8ab5869e13e97b0b1e339a0"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t08.png",
+      "v2_path": "data/samples/multiview/t08.png",
+      "v1_sha256": "8ac6afcefa112c9eeaa47ad66112beab18afee140590a6d22ac848e6a4a1a43e",
+      "v2_sha256": "8ac6afcefa112c9eeaa47ad66112beab18afee140590a6d22ac848e6a4a1a43e",
+      "v1_git_sha256": "8ac6afcefa112c9eeaa47ad66112beab18afee140590a6d22ac848e6a4a1a43e"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t09.png",
+      "v2_path": "data/samples/multiview/t09.png",
+      "v1_sha256": "6b6eeb27a9a2d23a2783c38080320fece587ebc81d0834033e4063c6c53266a0",
+      "v2_sha256": "6b6eeb27a9a2d23a2783c38080320fece587ebc81d0834033e4063c6c53266a0",
+      "v1_git_sha256": "6b6eeb27a9a2d23a2783c38080320fece587ebc81d0834033e4063c6c53266a0"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t1.png",
+      "v2_path": "data/samples/multiview/t1.png",
+      "v1_sha256": "8f9a43dd79c44db2ac07c63607233b17b4a512b65beff24db405ca713c94c64a",
+      "v2_sha256": "8f9a43dd79c44db2ac07c63607233b17b4a512b65beff24db405ca713c94c64a",
+      "v1_git_sha256": "8f9a43dd79c44db2ac07c63607233b17b4a512b65beff24db405ca713c94c64a"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t10.png",
+      "v2_path": "data/samples/multiview/t10.png",
+      "v1_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v2_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b",
+      "v1_git_sha256": "f3a29e5dcbb90cbd3ed7c52d9c43736d57754d6f76e5bb00761f4846f332084b"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t11.png",
+      "v2_path": "data/samples/multiview/t11.png",
+      "v1_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v2_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d",
+      "v1_git_sha256": "7362f244603317bf9badfd9538972bd31f43018801cb0165303372ca66dc266d"
+    },
+    {
+      "v1_path": "openGL_enhance/input/t2.png",
+      "v2_path": "data/samples/multiview/t2.png",
+      "v1_sha256": "a0d3789e4de63223659a4e6d1722404bdc2896232d82645170ce4132c7c3b20f",
+      "v2_sha256": "a0d3789e4de63223659a4e6d1722404bdc2896232d82645170ce4132c7c3b20f",
+      "v1_git_sha256": "a0d3789e4de63223659a4e6d1722404bdc2896232d82645170ce4132c7c3b20f"
+    },
+    {
+      "v1_path": "openGL_enhance/input/top.png",
+      "v2_path": "data/samples/multiview/top.png",
+      "v1_sha256": "9fda5f766893c0409d37972b49f7206405f91456eeb4b1c23f67c8cfcdbff60e",
+      "v2_sha256": "9fda5f766893c0409d37972b49f7206405f91456eeb4b1c23f67c8cfcdbff60e",
+      "v1_git_sha256": "9fda5f766893c0409d37972b49f7206405f91456eeb4b1c23f67c8cfcdbff60e"
+    },
+    {
+      "v1_path": "openGL_enhance/multi-view-3d-reconstruction.vcxproj",
+      "v2_path": "build/vs/multi-view-3d-reconstruction.vcxproj",
+      "v1_sha256": "f4540fa444d4d175b943a3cec3b238e997587cfa3ad9b111e4f1a20a72301c48",
+      "v2_sha256": "3a65fd7ae90543951db18ee0d7701b86f0b82d87fbe80b101f06dc56249116ff",
+      "v1_git_sha256": "6c4133bd1078a277f0b2da86200dfac7dc60439ea45eb84ec402af298de36198"
+    },
+    {
+      "v1_path": "openGL_enhance/multi-view-3d-reconstruction.vcxproj.filters",
+      "v2_path": "build/vs/multi-view-3d-reconstruction.vcxproj.filters",
+      "v1_sha256": "44bc9fe1857df8da0dee95d4f944c5a5804777252096ec88e131966a7aec2dba",
+      "v2_sha256": "78b77c47fc0f7b5b36fa37d60cdcd9ef3e8b13c3c1215b305db24c6f90e6e2cc",
+      "v1_git_sha256": "2ac887bc629d9addcbc0a37dd99412b603eeaee8bdc63028a64062fc5e014a6a"
+    },
+    {
+      "v1_path": "openGL_enhance/new_try.cpp",
+      "v2_path": "src/legacy/new_try.cpp",
+      "v1_sha256": "0876916c75c8acbcf70df39e8698a3627f1fb3535121f941a7da59a41c1cfb98",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "a3ba91cef4bc70ea94f23373ea2a8612cb33c7a647b100bd8a5c5dd4fee12d98",
+      "v1_git_sha256": "5afdbef11f72399d94a6a7164b62871a7e97606dffd71ae734bc0c7ab87b0c87"
+    },
+    {
+      "v1_path": "openGL_enhance/test.cpp",
+      "v2_path": "experiments/multiview/test.cpp",
+      "v1_sha256": "798680385dfd216214619bf73581d21013a0e7ccab311b3285e0e75543a58a69",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "81f178b47b2f31859f08e526d0ad881e92d0035d3b8050552451d767f0ce27f8",
+      "v1_git_sha256": "d0f93bd5bcd5f00bfe8c72c36c0e94e973f9c029efb04fd80ca0585c23d649fc"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/color.jpg",
+      "v2_path": "data/samples/rgbd/color.jpg",
+      "v1_sha256": "44d83aeacbddf96b616899312a829261c30daa14993cb687dfd7af28823838d7",
+      "v2_sha256": "44d83aeacbddf96b616899312a829261c30daa14993cb687dfd7af28823838d7",
+      "v1_git_sha256": "44d83aeacbddf96b616899312a829261c30daa14993cb687dfd7af28823838d7"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/color2.jpg",
+      "v2_path": "data/samples/rgbd/color2.jpg",
+      "v1_sha256": "c22068c01efa7cff1d6d0c9cfc138bca4f18b9b34704298a609e4ce72dcf7d3b",
+      "v2_sha256": "c22068c01efa7cff1d6d0c9cfc138bca4f18b9b34704298a609e4ce72dcf7d3b",
+      "v1_git_sha256": "c22068c01efa7cff1d6d0c9cfc138bca4f18b9b34704298a609e4ce72dcf7d3b"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/color3.jpg",
+      "v2_path": "data/samples/rgbd/color3.jpg",
+      "v1_sha256": "4b847c039dd05f8f18bdf4c043a17ed0caabdca2deb5eeafbed5ce845081e04d",
+      "v2_sha256": "4b847c039dd05f8f18bdf4c043a17ed0caabdca2deb5eeafbed5ce845081e04d",
+      "v1_git_sha256": "4b847c039dd05f8f18bdf4c043a17ed0caabdca2deb5eeafbed5ce845081e04d"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/color4.jpg",
+      "v2_path": "data/samples/rgbd/color4.jpg",
+      "v1_sha256": "764dffd4d97bbacd620bc005fa86837018393ccb5ffd1059c2245a3cacff7782",
+      "v2_sha256": "764dffd4d97bbacd620bc005fa86837018393ccb5ffd1059c2245a3cacff7782",
+      "v1_git_sha256": "764dffd4d97bbacd620bc005fa86837018393ccb5ffd1059c2245a3cacff7782"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/color5.jpg",
+      "v2_path": "data/samples/rgbd/color5.jpg",
+      "v1_sha256": "42a8eb97bdd4de24537f029c10c2569205f6732b4513d39f7db13d7dd213b9ac",
+      "v2_sha256": "42a8eb97bdd4de24537f029c10c2569205f6732b4513d39f7db13d7dd213b9ac",
+      "v1_git_sha256": "42a8eb97bdd4de24537f029c10c2569205f6732b4513d39f7db13d7dd213b9ac"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/depth.png",
+      "v2_path": "data/samples/rgbd/depth.png",
+      "v1_sha256": "be15bb1c2b847a31a10cddffcba734fbd8a16d4bc740ce5fe94e12df66a49456",
+      "v2_sha256": "be15bb1c2b847a31a10cddffcba734fbd8a16d4bc740ce5fe94e12df66a49456",
+      "v1_git_sha256": "be15bb1c2b847a31a10cddffcba734fbd8a16d4bc740ce5fe94e12df66a49456"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/depth2.png",
+      "v2_path": "data/samples/rgbd/depth2.png",
+      "v1_sha256": "6b488fd40508816baf67655e7f76bcff782218fbbeeba14365df244dd859be87",
+      "v2_sha256": "6b488fd40508816baf67655e7f76bcff782218fbbeeba14365df244dd859be87",
+      "v1_git_sha256": "6b488fd40508816baf67655e7f76bcff782218fbbeeba14365df244dd859be87"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/depth3.png",
+      "v2_path": "data/samples/rgbd/depth3.png",
+      "v1_sha256": "2c245a333671965ddca76a148aa2c9e7c9993572ca0cd45b90948b8c6074fc4f",
+      "v2_sha256": "2c245a333671965ddca76a148aa2c9e7c9993572ca0cd45b90948b8c6074fc4f",
+      "v1_git_sha256": "2c245a333671965ddca76a148aa2c9e7c9993572ca0cd45b90948b8c6074fc4f"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/depth4.png",
+      "v2_path": "data/samples/rgbd/depth4.png",
+      "v1_sha256": "bb5a86542b9ee10d955de0e3ef6ba343a234ccf02043e35a04afdc54b2c33758",
+      "v2_sha256": "bb5a86542b9ee10d955de0e3ef6ba343a234ccf02043e35a04afdc54b2c33758",
+      "v1_git_sha256": "bb5a86542b9ee10d955de0e3ef6ba343a234ccf02043e35a04afdc54b2c33758"
+    },
+    {
+      "v1_path": "openGL_enhance/test_img/player.jpg",
+      "v2_path": "data/samples/rgbd/player.jpg",
+      "v1_sha256": "43ac92c68acedbff9fab41e39ce10afbda1dcd085c51b7f32c63ae6f312f84d1",
+      "v2_sha256": "43ac92c68acedbff9fab41e39ce10afbda1dcd085c51b7f32c63ae6f312f84d1",
+      "v1_git_sha256": "43ac92c68acedbff9fab41e39ce10afbda1dcd085c51b7f32c63ae6f312f84d1"
+    },
+    {
+      "v1_path": "openGL_enhance/try_depth_range.cpp",
+      "v2_path": "experiments/multiview/try_depth_range.cpp",
+      "v1_sha256": "b155cf45410ed63c41f16cdd1e61c01f3c54624d1c1ed1a3235bc33eaf7851dc",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "6c869883372985926a9c6ccbb87696f887ffe34b78112d31600d123ddcbd7c45",
+      "v1_git_sha256": "28902d53d71188ed426fe841ef6871373b33a5da3d55f27a17416a5ede745ae9"
+    },
+    {
+      "v1_path": "openGL_enhance/v1_4.15.cpp",
+      "v2_path": "archive/algorithms/v1_4.15.cpp",
+      "v1_sha256": "8fa76631c11d6ac14c744334c2d8a99552043e9b3bcc7e2459be1202f5810fd5",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "d56ac5c1129c7a33b78579409cec4be81ef5dd585b78d0c5e393ae9ea5f25865",
+      "v1_git_sha256": "d0988c85c40ca9c37b22746437fca74af184f17a08f9f451b11bbc8c0b8e8930"
+    },
+    {
+      "v1_path": "openGL_enhance/v2_4.21.cpp",
+      "v2_path": "archive/algorithms/v2_4.21.cpp",
+      "v1_sha256": "99645a7b33e49e17a7eb34d3a75faba9ef4f079482d3a55e8cc4c382d715e1f1",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "b11dedfd43dc858c9df6baef61282cdcc7d9aa38bca55f12add06b48f8e26bce",
+      "v1_git_sha256": "d0edb537d82a908c16b11e5113fe480df1ada179cc41104a42a44604a4ee4a16"
+    },
+    {
+      "v1_path": "openGL_enhance/v3_4.29.cpp",
+      "v2_path": "archive/algorithms/v3_4.29.cpp",
+      "v1_sha256": "19dba8023a7a66f9526ee1327c7e90d6c76b5d9665ad805e18541eeb987895a3",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "959bf3b14477d2606e4f96f63e3996dbb91a0d7be7a8519b51ec5a15460aee91",
+      "v1_git_sha256": "ae9abe19df23ef77d6c80b8e5c7342c129d757479c973cb30a4252d1ee87d554"
+    },
+    {
+      "v1_path": "openGL_enhance/v4_5.26.cpp",
+      "v2_path": "archive/algorithms/v4_5.26.cpp",
+      "v1_sha256": "ad24273e27527d99475654234e5a4a2a2661a1606f98f5fec660f096b317a5e2",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "104874d2b8fba0bf626003ab037c7251c13bc3a7ed4c36a7f085620dae211d56",
+      "v1_git_sha256": "d49f8363751aee105ac4f9549d1cb9e4ee0bdf95f1ecd6ea0c0401075733f888"
+    },
+    {
+      "v1_path": "openGL_enhance/v5_confidence.cpp",
+      "v2_path": "src/reconstruction/v5_confidence.cpp",
+      "v1_sha256": "7eb7ef952e693789781680dee6581d7833404b4667e4d889401619cad2f50843",
+      "changes": "runtime paths and documentation references only",
+      "v2_sha256": "1fb77746553b17ae8ea840cf8fe4ba75621c55b6888f901249eb77976ebefacb",
+      "v1_git_sha256": "912d6dd3596ea03c662b152f90e790c89790183b542f7d0be9fc4aec90c72881"
+    }
+  ],
+  "hash_policy": "v1_sha256: original working-tree bytes; v1_git_sha256 and v2_sha256: LF-normalized text or unchanged image bytes"
+}

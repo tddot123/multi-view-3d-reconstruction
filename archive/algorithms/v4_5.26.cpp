@@ -1,4 +1,4 @@
-﻿#include <GL/freeglut.h>
+﻿/*#include <GL/freeglut.h>
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <iostream>
@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <cfloat>
 #include <cmath>
-#include <algorithm>
 
 using namespace cv;
 using namespace std;
@@ -59,35 +58,14 @@ int GRID_Z;
 
 static vector<uint8_t> voxelOcc;   // 0/1 occupancy (final after carving)
 static vector<Vec3b> voxelCol;     // per-voxel color
-static vector<uint8_t> voxelVote;  // supporting view count (0..255)
-static vector<uint8_t> voxelSrc;   // bitmask: which view(s) wrote this voxel
-static vector<float> voxelSupport; // accumulated support weight
-static vector<float> voxelReject;  // accumulated weighted rejection
+static vector<uint8_t> voxelVote;  // vote count (0..255)
+static vector<uint8_t> voxelSrc;   // bitmask: which view(s) support this voxel
 
-// per-view scratch before soft carving (v4 full-ray fill)
+// per-view scratch: "possibly occupied" volume before intersection
 static vector<uint8_t> voxelPossible;
 static vector<Vec3b> voxelPossibleCol;
 static bool carveFirstView = true;
 static int carvedViewCount = 0;
-
-// depth fine-tune before voxelization
-static const int DEPTH_CELL_MIN_FG = 2;
-static const int DEPTH_CELL_GOOD_FG = 4;
-static const int DEPTH_CELL_MAX_SPREAD = 65;
-static const int DEPTH_CELL_SOFT_SPREAD = 35;
-static const int DEPTH_MEDIAN_COLOR_BAND = 4;
-
-// selective soft carving on v4 solid visual hull
-static const float GRADIENT_HIGH_THRESHOLD = 12.0f;
-static const float GRADIENT_LOW_THRESHOLD = 5.0f;
-static const float REJECT_WEIGHT_FLAT = 1.0f;
-static const float REJECT_WEIGHT_EDGE = 0.22f;
-static const int TOL_UCHAR_FLAT = 2;
-static const int TOL_UCHAR_EDGE = 8;
-static const float SURVIVAL_REJECT_RATIO = 1.15f;
-static const float CONTINUITY_MIN_SUPPORT = 2.0f;
-static const int CONTINUITY_MIN_NEIGHBORS_26 = 8;
-static const int ISOLATE_MAX_NEIGHBORS_26 = 2;
 
 float cubeSize = 2.0f;
 
@@ -119,30 +97,16 @@ static inline bool inBounds(int x, int y, int z)
 
 static void buildView(ViewId id);
 static void safeSetColor(int x, int y, int z, Vec3b c, uint8_t srcBit);
+static void removeIsolatedVoxels(int minNeighborCount);
+static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLargest);
+
+// volume carving helpers
 static void resetPossibleVolume();
 static void markPossibleVoxel(int x, int y, int z, const Vec3b& c);
-static void applySoftVoxelCarving(ViewId id, uint8_t srcBit,
-    const vector<float>& cellRejectWeight, int aSize, int bSize);
-static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, int tolVox, const Vec3b& c);
-static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, int tolVox, const Vec3b& c);
-static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, int tolVox, const Vec3b& c);
-static void finalizeSelectiveSoftCarving();
-struct DepthSample;
-struct ProjCellMeta;
-static bool resolveStableProjCell(
-    const vector<DepthSample>& samples,
-    ProjCellMeta& outMeta);
-static float computeProjCellGradient(
-    const vector<vector<DepthSample>>& cells,
-    int aSize, int bSize, int a, int b, uchar centerDepth);
-static float rejectWeightFromGradient(float gradient);
-static int adaptiveTolVoxels(float gradient, int gridDim);
-static int projCellIndex(ViewId id, int x, int y, int z, int bSize);
-static float survivalRejectRatio(int votes);
-static void applyContinuity26();
-static void pruneIsolatedVoxels26();
-static int countOccupiedNeighbors26(int x, int y, int z, const vector<uint8_t>& occ);
-void finalizeVoxelByVote(unsigned char minVote);
+static void applyVoxelIntersection(uint8_t srcBit);
+static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, const Vec3b& c);
+static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, const Vec3b& c);
+static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, const Vec3b& c);
 static int mapLeftDepthToX(uchar u);
 static int mapRightDepthToX(uchar u);
 static int mapTopDepthToY(uchar u);
@@ -391,7 +355,7 @@ Mat runDepthAnything(Mat& inputImg)
 
     static Ort::Session session(
         env,
-        L"model/depth_anything_v2_large.onnx",
+        L"models/depth_anything_v2_large.onnx",
         opts);
 
     Mat img;
@@ -451,8 +415,8 @@ Mat runDepthAnything(Mat& inputImg)
         .GetShape();
 
     Mat depth(
-        (int)outShape[1],
-        (int)outShape[2],
+        outShape[1],
+        outShape[2],
         CV_32F,
         data);
 
@@ -567,7 +531,7 @@ static std::string makeDepthDebugPath(const std::string& inputImagePath, const c
     if (dot != std::string::npos)
         stem = stem.substr(0, dot);
 
-    return std::string("output/") + stem + "_depth_" + std::string(dirName) + ".png";
+    return std::string("outputs/") + stem + "_depth_" + std::string(dirName) + ".png";
 }
 
 struct MaskedDepthRange
@@ -712,148 +676,8 @@ static int mapTopDepthToY(uchar u)
 }
 
 ////////////////////////////////////////////////////////
-// v4 solid full-ray carving + selective soft constraints
+// volume carving: per-view possible volume + intersection
 ////////////////////////////////////////////////////////
-
-struct DepthSample
-{
-    uchar d = 0;
-    Vec3b c;
-};
-
-struct ProjCellMeta
-{
-    uchar depth = 0;
-    Vec3b color;
-    int confidence = 0;
-    int spread = 0;
-    float gradient = 0.f;
-};
-
-static float rejectWeightFromGradient(float gradient)
-{
-    if (gradient <= GRADIENT_LOW_THRESHOLD)
-        return REJECT_WEIGHT_FLAT;
-    if (gradient >= GRADIENT_HIGH_THRESHOLD)
-        return REJECT_WEIGHT_EDGE;
-    const float t = (gradient - GRADIENT_LOW_THRESHOLD) /
-        (GRADIENT_HIGH_THRESHOLD - GRADIENT_LOW_THRESHOLD);
-    return REJECT_WEIGHT_FLAT - t * (REJECT_WEIGHT_FLAT - REJECT_WEIGHT_EDGE);
-}
-
-static int adaptiveTolVoxels(float gradient, int gridDim)
-{
-    const int flatTol = std::max(1, (int)((float)TOL_UCHAR_FLAT * (gridDim - 1) / 254.0f + 0.5f));
-    const int edgeTol = std::max(flatTol + 1, (int)((float)TOL_UCHAR_EDGE * (gridDim - 1) / 254.0f + 0.5f));
-    if (gradient <= GRADIENT_LOW_THRESHOLD)
-        return flatTol;
-    if (gradient >= GRADIENT_HIGH_THRESHOLD)
-        return edgeTol;
-    const float t = (gradient - GRADIENT_LOW_THRESHOLD) /
-        (GRADIENT_HIGH_THRESHOLD - GRADIENT_LOW_THRESHOLD);
-    return (int)(flatTol + t * (edgeTol - flatTol) + 0.5f);
-}
-
-static float survivalRejectRatio(int votes)
-{
-    if (votes >= 4) return SURVIVAL_REJECT_RATIO * 0.72f;
-    if (votes == 3) return SURVIVAL_REJECT_RATIO * 0.85f;
-    if (votes == 2) return SURVIVAL_REJECT_RATIO;
-    return SURVIVAL_REJECT_RATIO * 1.25f;
-}
-
-static int projCellIndex(ViewId id, int x, int y, int z, int bSize)
-{
-    switch (id)
-    {
-    case ViewId::Front:
-    case ViewId::Back:
-        return x * bSize + y;
-    case ViewId::Left:
-    case ViewId::Right:
-        return z * bSize + y;
-    case ViewId::Top:
-        return x * bSize + z;
-    default:
-        return -1;
-    }
-}
-
-static uchar medianDepthOfSamples(const vector<DepthSample>& samples)
-{
-    vector<uchar> depths;
-    depths.reserve(samples.size());
-    for (const auto& s : samples)
-        depths.push_back(s.d);
-    sort(depths.begin(), depths.end());
-    return depths[depths.size() / 2];
-}
-
-static float computeProjCellGradient(
-    const vector<vector<DepthSample>>& cells,
-    int aSize, int bSize, int a, int b, uchar centerDepth)
-{
-    float maxGrad = 0.f;
-    const int da[] = { -1, 1, 0, 0 };
-    const int db[] = { 0, 0, -1, 1 };
-    for (int k = 0; k < 4; k++)
-    {
-        const int na = a + da[k];
-        const int nb = b + db[k];
-        if (na < 0 || nb < 0 || na >= aSize || nb >= bSize)
-            continue;
-        const vector<DepthSample>& ns = cells[(size_t)(na * bSize + nb)];
-        if (ns.empty())
-            continue;
-        const uchar nd = medianDepthOfSamples(ns);
-        maxGrad = std::max(maxGrad, (float)abs((int)nd - (int)centerDepth));
-    }
-    return maxGrad;
-}
-
-static bool resolveStableProjCell(
-    const vector<DepthSample>& samples,
-    ProjCellMeta& outMeta)
-{
-    const int n = (int)samples.size();
-    if (n < DEPTH_CELL_MIN_FG)
-        return false;
-
-    vector<uchar> depths;
-    depths.reserve((size_t)n);
-    for (const auto& s : samples)
-        depths.push_back(s.d);
-    sort(depths.begin(), depths.end());
-
-    const int spread = (int)depths.back() - (int)depths.front();
-    if (spread > DEPTH_CELL_MAX_SPREAD)
-        return false;
-
-    outMeta.depth = depths[n / 2];
-    outMeta.spread = spread;
-
-    int bSum = 0, gSum = 0, rSum = 0, hit = 0;
-    for (const auto& s : samples)
-    {
-        if (abs((int)s.d - (int)outMeta.depth) > DEPTH_MEDIAN_COLOR_BAND)
-            continue;
-        bSum += (int)s.c[0];
-        gSum += (int)s.c[1];
-        rSum += (int)s.c[2];
-        hit++;
-    }
-    if (hit <= 0)
-        outMeta.color = samples[n / 2].c;
-    else
-        outMeta.color = Vec3b((uchar)(bSum / hit), (uchar)(gSum / hit), (uchar)(rSum / hit));
-
-    outMeta.confidence = 255;
-    if (spread > DEPTH_CELL_SOFT_SPREAD)
-        outMeta.confidence = 140;
-    if (n < DEPTH_CELL_GOOD_FG)
-        outMeta.confidence = min(outMeta.confidence, 160);
-    return true;
-}
 
 static void resetPossibleVolume()
 {
@@ -880,14 +704,10 @@ static void markPossibleVoxel(int x, int y, int z, const Vec3b& c)
     }
 }
 
-static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, int tolVox, const Vec3b& c)
+// Front: z=0..bound ; Back: z=bound..GRID_Z-1
+static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, const Vec3b& c)
 {
     zBound = min(GRID_Z - 1, max(0, zBound));
-    if (fromMinZ)
-        zBound = min(GRID_Z - 1, zBound + tolVox);
-    else
-        zBound = max(0, zBound - tolVox);
-
     if (fromMinZ)
     {
         for (int z = 0; z <= zBound; z++)
@@ -900,14 +720,10 @@ static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, int tolVox, c
     }
 }
 
-static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, int tolVox, const Vec3b& c)
+// Left: x=0..bound ; Right: x=bound..GRID_X-1
+static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, const Vec3b& c)
 {
     xBound = min(GRID_X - 1, max(0, xBound));
-    if (fromMinX)
-        xBound = min(GRID_X - 1, xBound + tolVox);
-    else
-        xBound = max(0, xBound - tolVox);
-
     if (fromMinX)
     {
         for (int x = 0; x <= xBound; x++)
@@ -920,14 +736,10 @@ static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, int tolVox, c
     }
 }
 
-static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, int tolVox, const Vec3b& c)
+// Top: y=0..bound (camera from +Y looking toward origin)
+static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, const Vec3b& c)
 {
     yBound = min(GRID_Y - 1, max(0, yBound));
-    if (fromMinY)
-        yBound = min(GRID_Y - 1, yBound + tolVox);
-    else
-        yBound = max(0, yBound - tolVox);
-
     if (fromMinY)
     {
         for (int y = 0; y <= yBound; y++)
@@ -940,8 +752,8 @@ static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, int tolVox, c
     }
 }
 
-static void applySoftVoxelCarving(ViewId id, uint8_t srcBit,
-    const vector<float>& cellRejectWeight, int aSize, int bSize)
+// Step 2: AND current view's possible volume into shared voxelOcc
+static void applyVoxelIntersection(uint8_t srcBit)
 {
     const size_t n = voxelOcc.size();
     if (carveFirstView)
@@ -954,135 +766,33 @@ static void applySoftVoxelCarving(ViewId id, uint8_t srcBit,
                 voxelCol[i] = voxelPossibleCol[i];
                 voxelSrc[i] = srcBit;
                 voxelVote[i] = 1;
-                voxelSupport[i] = 1.0f;
-                voxelReject[i] = 0.0f;
             }
         }
         carveFirstView = false;
         return;
     }
 
-    for (int x = 0; x < GRID_X; x++)
-        for (int y = 0; y < GRID_Y; y++)
-            for (int z = 0; z < GRID_Z; z++)
-            {
-                const int idx = voxelIndex(x, y, z);
-                const int pidx = projCellIndex(id, x, y, z, bSize);
-                const float rejW = (pidx >= 0 && pidx < (int)cellRejectWeight.size())
-                    ? cellRejectWeight[(size_t)pidx] : REJECT_WEIGHT_FLAT;
+    for (size_t i = 0; i < n; i++)
+    {
+        if (!voxelPossible[i])
+        {
+            voxelOcc[i] = 0;
+            continue;
+        }
+        if (!voxelOcc[i])
+            continue;
 
-                if (voxelPossible[idx])
-                {
-                    if (!voxelOcc[idx])
-                        continue;
-
-                    if (!(voxelSrc[idx] & srcBit))
-                    {
-                        if (voxelVote[idx] < 255)
-                            voxelVote[idx]++;
-                        voxelSrc[idx] |= srcBit;
-                    }
-                    voxelSupport[idx] += 1.0f;
-
-                    const Vec3b neu = voxelPossibleCol[idx];
-                    const Vec3b old = voxelCol[idx];
-                    voxelCol[idx] = Vec3b(
-                        (uchar)(((int)old[0] + (int)neu[0]) / 2),
-                        (uchar)(((int)old[1] + (int)neu[1]) / 2),
-                        (uchar)(((int)old[2] + (int)neu[2]) / 2)
-                    );
-                }
-                else if (voxelOcc[idx])
-                {
-                    voxelReject[idx] += rejW;
-                }
-            }
-}
-
-static int countOccupiedNeighbors26(int x, int y, int z, const vector<uint8_t>& occ)
-{
-    int count = 0;
-    for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dz = -1; dz <= 1; dz++)
-            {
-                if (dx == 0 && dy == 0 && dz == 0)
-                    continue;
-                const int nx = x + dx, ny = y + dy, nz = z + dz;
-                if (!inBounds(nx, ny, nz))
-                    continue;
-                if (occ[voxelIndex(nx, ny, nz)])
-                    count++;
-            }
-    return count;
-}
-
-static void applyContinuity26()
-{
-    vector<uint8_t> restored = voxelOcc;
-
-    for (int x = 0; x < GRID_X; x++)
-        for (int y = 0; y < GRID_Y; y++)
-            for (int z = 0; z < GRID_Z; z++)
-            {
-                const int idx = voxelIndex(x, y, z);
-                if (voxelOcc[idx])
-                    continue;
-                if (voxelSupport[idx] < CONTINUITY_MIN_SUPPORT)
-                    continue;
-
-                const int neighbors = countOccupiedNeighbors26(x, y, z, voxelOcc);
-                if (neighbors >= CONTINUITY_MIN_NEIGHBORS_26)
-                    restored[idx] = 1;
-            }
-
-    voxelOcc = restored;
-}
-
-static void pruneIsolatedVoxels26()
-{
-    vector<uint8_t> pruned = voxelOcc;
-
-    for (int x = 0; x < GRID_X; x++)
-        for (int y = 0; y < GRID_Y; y++)
-            for (int z = 0; z < GRID_Z; z++)
-            {
-                const int idx = voxelIndex(x, y, z);
-                if (!voxelOcc[idx])
-                    continue;
-
-                const int neighbors = countOccupiedNeighbors26(x, y, z, voxelOcc);
-                if (neighbors <= ISOLATE_MAX_NEIGHBORS_26 && voxelVote[idx] < 3)
-                    pruned[idx] = 0;
-            }
-
-    voxelOcc = pruned;
-}
-
-static void finalizeSelectiveSoftCarving()
-{
-    for (int x = 0; x < GRID_X; x++)
-        for (int y = 0; y < GRID_Y; y++)
-            for (int z = 0; z < GRID_Z; z++)
-            {
-                const int idx = voxelIndex(x, y, z);
-                if (!voxelOcc[idx])
-                    continue;
-
-                const float support = voxelSupport[idx];
-                const float reject = voxelReject[idx];
-                const int votes = (int)voxelVote[idx];
-                const float ratio = survivalRejectRatio(votes);
-
-                bool keep = support > 0.f && support >= reject * ratio;
-                if (!keep && votes >= 3 && support >= reject * ratio * 0.8f)
-                    keep = true;
-
-                voxelOcc[idx] = keep ? 1 : 0;
-            }
-
-    applyContinuity26();
-    pruneIsolatedVoxels26();
+        const Vec3b old = voxelCol[i];
+        const Vec3b neu = voxelPossibleCol[i];
+        voxelCol[i] = Vec3b(
+            (uchar)(((int)old[0] + (int)neu[0]) / 2),
+            (uchar)(((int)old[1] + (int)neu[1]) / 2),
+            (uchar)(((int)old[2] + (int)neu[2]) / 2)
+        );
+        voxelSrc[i] |= srcBit;
+        if (voxelVote[i] < 255)
+            voxelVote[i]++;
+    }
 }
 
 ////////////////////////////////////////////////////////
@@ -1096,8 +806,6 @@ void initVoxel()
     voxelCol.assign(n, Vec3b(0, 0, 0));
     voxelVote.assign(n, 0);
     voxelSrc.assign(n, 0);
-    voxelSupport.assign(n, 0.f);
-    voxelReject.assign(n, 0.f);
     voxelPossible.assign(n, 0);
     voxelPossibleCol.assign(n, Vec3b(0, 0, 0));
     carveFirstView = true;
@@ -1142,9 +850,158 @@ void finalizeVoxelByVote(unsigned char minVote)
             }
 }
 
+void removeIsolatedVoxels(int minNeighborCount)
+{
+    vector<uint8_t> keep(voxelOcc.size(), 0);
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                const int idx = voxelIndex(x, y, z);
+                if (!voxelOcc[idx]) continue;
+
+                int neighbors = 0;
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            if (dx == 0 && dy == 0 && dz == 0) continue;
+                            int nx = x + dx, ny = y + dy, nz = z + dz;
+                            if (!inBounds(nx, ny, nz)) continue;
+                            if (voxelOcc[voxelIndex(nx, ny, nz)]) neighbors++;
+                        }
+
+                if (neighbors >= minNeighborCount)
+                    keep[idx] = 1;
+            }
+
+    voxelOcc.swap(keep);
+}
+
+static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLargest)
+{
+    vector<uint8_t> visited(voxelOcc.size(), 0);
+
+    int bestSize = 0;
+
+    // 6-neighborhood flood fill queue (store 1D indices)
+    vector<int> q;
+    q.reserve(4096);
+
+    // First pass: find largest component size
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                const int start = voxelIndex(x, y, z);
+                if (!voxelOcc[start] || visited[start]) continue;
+
+                q.clear();
+                q.push_back(start);
+                visited[start] = 1;
+
+                int size = 0;
+                for (size_t qi = 0; qi < q.size(); qi++)
+                {
+                    const int idx = q[qi];
+                    size++;
+
+                    const int cx = idx / (GRID_Y * GRID_Z);
+                    const int rem = idx - cx * (GRID_Y * GRID_Z);
+                    const int cy = rem / GRID_Z;
+                    const int cz = rem - cy * GRID_Z;
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        int xx = cx, yy = cy, zz = cz;
+                        if (i == 0) xx--;
+                        else if (i == 1) xx++;
+                        else if (i == 2) yy--;
+                        else if (i == 3) yy++;
+                        else if (i == 4) zz--;
+                        else zz++;
+
+                        if (!inBounds(xx, yy, zz)) continue;
+                        const int nidx = voxelIndex(xx, yy, zz);
+                        if (!voxelOcc[nidx] || visited[nidx]) continue;
+                        visited[nidx] = 1;
+                        q.push_back(nidx);
+                    }
+                }
+
+                if (size > bestSize)
+                {
+                    bestSize = size;
+                }
+            }
+
+    if (bestSize <= 0)
+        return;
+
+    const int ratioKeep = (int)(bestSize * keepRatioOfLargest);
+    const int threshold = max(1, max(minKeepSize, ratioKeep));
+
+    vector<uint8_t> keep(voxelOcc.size(), 0);
+    fill(visited.begin(), visited.end(), 0);
+
+    // Second pass: keep any component whose size >= threshold
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                const int start = voxelIndex(x, y, z);
+                if (!voxelOcc[start] || visited[start]) continue;
+
+                q.clear();
+                q.push_back(start);
+                visited[start] = 1;
+
+                int size = 0;
+                for (size_t qi = 0; qi < q.size(); qi++)
+                {
+                    const int idx = q[qi];
+                    size++;
+
+                    const int cx = idx / (GRID_Y * GRID_Z);
+                    const int rem = idx - cx * (GRID_Y * GRID_Z);
+                    const int cy = rem / GRID_Z;
+                    const int cz = rem - cy * GRID_Z;
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        int xx = cx, yy = cy, zz = cz;
+                        if (i == 0) xx--;
+                        else if (i == 1) xx++;
+                        else if (i == 2) yy--;
+                        else if (i == 3) yy++;
+                        else if (i == 4) zz--;
+                        else zz++;
+
+                        if (!inBounds(xx, yy, zz)) continue;
+                        const int nidx = voxelIndex(xx, yy, zz);
+                        if (!voxelOcc[nidx] || visited[nidx]) continue;
+                        visited[nidx] = 1;
+                        q.push_back(nidx);
+                    }
+                }
+
+                if (size >= threshold)
+                {
+                    for (size_t i = 0; i < q.size(); i++)
+                        keep[q[i]] = 1;
+                }
+            }
+
+    voxelOcc.swap(keep);
+}
+
 ////////////////////////////////////////////////////////
-// buildView: v4 full-ray fill + selective soft carving
+// ⭐build 全部保留（只改 GRID→GRID_X/Y/Z）
 ////////////////////////////////////////////////////////
+
+// buildFront/buildBack/buildLeft/buildRight/buildTop 已合并为 buildView(ViewId)
+// 每个视角：深度方向填满“可能占用”体积 → 多视角体素交集雕刻
 
 static void buildView(ViewId id)
 {
@@ -1186,9 +1043,13 @@ static void buildView(ViewId id)
     const int h = depth->rows;
 
     const int projN = aSize * bSize;
-    vector<vector<DepthSample>> cells((size_t)projN);
+    vector<int> depthSum(projN, 0);
+    vector<int> colorBSum(projN, 0);
+    vector<int> colorGSum(projN, 0);
+    vector<int> colorRSum(projN, 0);
+    vector<int> hitCount(projN, 0);
 
-    // Step 1: mask-only samples into projection cells (no background averaging)
+    // Step 1a: 聚合到投影网格 (a,b)
     for (int py = 0; py < h; py++)
         for (int px = 0; px < w; px++)
         {
@@ -1198,6 +1059,8 @@ static void buildView(ViewId id)
             const uchar d = depth->at<uchar>(py, px);
             if (d == 0)
                 continue;
+
+            const Vec3b c = img->at<Vec3b>(py, px);
 
             int a = 0;
             int b = 0;
@@ -1223,10 +1086,11 @@ static void buildView(ViewId id)
                 continue;
 
             const int pidx = a * bSize + b;
-            DepthSample s;
-            s.d = d;
-            s.c = img->at<Vec3b>(py, px);
-            cells[(size_t)pidx].push_back(s);
+            depthSum[pidx] += (int)d;
+            colorBSum[pidx] += (int)c[0];
+            colorGSum[pidx] += (int)c[1];
+            colorRSum[pidx] += (int)c[2];
+            hitCount[pidx]++;
         }
 
     uint8_t srcBit = 0;
@@ -1242,73 +1106,62 @@ static void buildView(ViewId id)
     resetPossibleVolume();
 
     int filledCells = 0;
-    int skippedCells = 0;
 
-    vector<float> cellRejectWeight((size_t)projN, REJECT_WEIGHT_FLAT);
-
-    // Step 2: median depth + edge-aware full-ray fill
+    // Step 1b: 沿深度轴填满“可能物体”体积（非薄壳）
     for (int a = 0; a < aSize; a++)
         for (int b = 0; b < bSize; b++)
         {
             const int pidx = a * bSize + b;
-            const vector<DepthSample>& samples = cells[(size_t)pidx];
-            if (samples.empty())
-                continue;
+            const int cnt = hitCount[pidx];
+            if (cnt <= 0) continue;
 
-            ProjCellMeta meta;
-            if (!resolveStableProjCell(samples, meta))
-            {
-                skippedCells++;
-                continue;
-            }
+            const uchar avgDepth = (uchar)(depthSum[pidx] / cnt);
 
-            meta.gradient = computeProjCellGradient(cells, aSize, bSize, a, b, meta.depth);
-            cellRejectWeight[(size_t)pidx] = rejectWeightFromGradient(meta.gradient);
+            const Vec3b avgColor(
+                (uchar)(colorBSum[pidx] / cnt),
+                (uchar)(colorGSum[pidx] / cnt),
+                (uchar)(colorRSum[pidx] / cnt)
+            );
 
             switch (id)
             {
             case ViewId::Front:
             {
-                const int z = mapFrontDepthToZ(meta.depth);
+                const int z = mapFrontDepthToZ(avgDepth);
                 if (z < 0) continue;
-                const int tol = adaptiveTolVoxels(meta.gradient, GRID_Z);
-                fillVolumeZ(a, b, z, true, tol, meta.color);
+                fillVolumeZ(a, b, z, true, avgColor);
                 filledCells++;
                 break;
             }
             case ViewId::Back:
             {
-                const int z = mapBackDepthToZ(meta.depth);
+                const int z = mapBackDepthToZ(avgDepth);
                 if (z < 0) continue;
-                const int tol = adaptiveTolVoxels(meta.gradient, GRID_Z);
-                fillVolumeZ(a, b, z, false, tol, meta.color);
+                fillVolumeZ(a, b, z, false, avgColor);
                 filledCells++;
                 break;
             }
             case ViewId::Left:
             {
-                const int x = mapLeftDepthToX(meta.depth);
+                const int x = mapLeftDepthToX(avgDepth);
                 if (x < 0) continue;
-                const int tol = adaptiveTolVoxels(meta.gradient, GRID_X);
-                fillVolumeX(b, a, x, true, tol, meta.color);
+                fillVolumeX(b, a, x, true, avgColor);
                 filledCells++;
                 break;
             }
             case ViewId::Right:
             {
-                const int x = mapRightDepthToX(meta.depth);
+                const int x = mapRightDepthToX(avgDepth);
                 if (x < 0) continue;
-                const int tol = adaptiveTolVoxels(meta.gradient, GRID_X);
-                fillVolumeX(b, a, x, false, tol, meta.color);
+                fillVolumeX(b, a, x, false, avgColor);
                 filledCells++;
                 break;
             }
             case ViewId::Top:
             {
-                const int y = mapTopDepthToY(meta.depth);
+                const int y = mapTopDepthToY(avgDepth);
                 if (y < 0) continue;
-                const int tol = adaptiveTolVoxels(meta.gradient, GRID_Y);
-                fillVolumeY(a, b, y, true, tol, meta.color);
+                fillVolumeY(a, b, y, true, avgColor);
                 filledCells++;
                 break;
             }
@@ -1320,7 +1173,8 @@ static void buildView(ViewId id)
     if (filledCells <= 0)
         return;
 
-    applySoftVoxelCarving(id, srcBit, cellRejectWeight, aSize, bSize);
+    // Step 2: 与已有体素空间求交
+    applyVoxelIntersection(srcBit);
     carvedViewCount++;
 
     const char* viewName = "?";
@@ -1332,8 +1186,7 @@ static void buildView(ViewId id)
     case ViewId::Right: viewName = "Right"; break;
     case ViewId::Top:   viewName = "Top"; break;
     }
-    cout << "  carve " << viewName << ": filled " << filledCells
-        << ", skipped(discontinuity/fg) " << skippedCells << endl;
+    cout << "  carve " << viewName << ": filled " << filledCells << " cells" << endl;
 }
 
 ////////////////////////////////////////////////////////
@@ -1493,11 +1346,11 @@ void motion(int x, int y)
 
 int main(int argc, char** argv)
 {
-    const std::string frontPath = "input/front.png";
-    const std::string backPath = "input/back.png";
-    const std::string leftPath = "input/left.png";
-    const std::string rightPath = "input/right.png";
-    const std::string topPath = "input/top.png";
+    const std::string frontPath = "data/samples/multiview/front.png";
+    const std::string backPath = "data/samples/multiview/back.png";
+    const std::string leftPath = "data/samples/multiview/left.png";
+    const std::string rightPath = "data/samples/multiview/right.png";
+    const std::string topPath = "data/samples/multiview/top.png";
 
     frontImgRaw = imread(frontPath);
     backImgRaw = imread(backPath);
@@ -1597,18 +1450,22 @@ int main(int argc, char** argv)
 
     initVoxel();
 
-    cout << "=== v4 selective soft carve ===" << endl;
+    // 多视角体积雕刻：每视角填满深度锥 → 体素交集 → 闭合实体
+    cout << "=== Volume carving (multi-view intersection) ===" << endl;
     buildView(ViewId::Front);
-    buildView(ViewId::Back);
-    buildView(ViewId::Left);
-    buildView(ViewId::Right);
-    buildView(ViewId::Top);
+    //buildView(ViewId::Back);
+    //buildView(ViewId::Left);
+    //buildView(ViewId::Right);
+    //buildView(ViewId::Top);
 
+    // Step 3: 至少被 2 个视角同时支持（仅当实际雕刻了 ≥2 个视角）
     if (carvedViewCount >= 2)
-    {
-        finalizeSelectiveSoftCarving();
         finalizeVoxelByVote(2);
-    }
+
+    // Step 4: 邻域去孤立点（值越大去噪越强）
+    removeIsolatedVoxels(2);
+    // 去掉漂浮“成团噪声”：保留足够大的连通块（避免误删手臂等小部件）
+    //keepConnectedComponentsBySize(200, 0.03f);
 
     cout << "Voxel Build Done" << endl;
 
@@ -1637,4 +1494,4 @@ int main(int argc, char** argv)
     glutMainLoop();
 
     return 0;
-}
+}*/

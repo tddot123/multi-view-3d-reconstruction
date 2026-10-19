@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Current" />
+    <Filter Include="Legacy" />
+    <Filter Include="Archived algorithms" />
+    <Filter Include="Single view experiments" />
+    <Filter Include="Multiview experiments" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\reconstruction\v5_confidence.cpp"><Filter>Current</Filter></ClCompile>
+    <ClCompile Include="..\..\src\legacy\new_try.cpp"><Filter>Legacy</Filter></ClCompile>
+    <None Include="..\..\archive\algorithms\*.cpp"><Filter>Archived algorithms</Filter></None>
+    <None Include="..\..\experiments\single_view\*.cpp"><Filter>Single view experiments</Filter></None>
+    <None Include="..\..\experiments\multiview\*.cpp"><Filter>Multiview experiments</Filter></None>
+  </ItemGroup>
+</Project>

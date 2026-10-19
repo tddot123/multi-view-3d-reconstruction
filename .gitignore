@@ -1,17 +1,21 @@
-# Visual Studio caches and local settings
+# IDE and machine-specific settings
 .vs/
 *.user
 *.suo
 *.VC.db
 *.VC.VC.opendb
+config/dependencies.local.props
 
-# Build products
+# Build products and caches (build/vs contains versioned project files)
+build/bin/
+build/obj/
+.build/
+.cache/
 [Dd]ebug/
 [Rr]elease/
 x64/
 x86/
 ipch/
-.build/
 *.obj
 *.pdb
 *.ilk
@@ -21,7 +25,10 @@ ipch/
 *.lib
 *.exp
 
-# Local model weights and generated experiment results
+# Local assets, generated results and preserved pre-v2 build files
 *.onnx
-openGL_enhance/output/
-openGL_enhance/debug_left_aligned.png
+outputs/
+runtime/*
+!runtime/README.md
+archive/local-v1/
+__pycache__/

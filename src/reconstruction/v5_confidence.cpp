@@ -1,6 +1,6 @@
 // V5: synchronized views, float relative depth and order-independent soft carving.
 // The existing axis-aligned / orthographic camera convention is retained.
-// This is not calibrated metric reconstruction. See V5_NOTES.md for controls.
+// This is not calibrated metric reconstruction. See docs/usage.md for controls.
 #include <GL/freeglut.h>
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
@@ -66,11 +66,11 @@ struct Config
     bool selfTest = false;
     bool snapshot = false;
     bool snapshotViews = false;
-    fs::path inputDir = "input";
-    fs::path outputDir = "output/v5";
-    fs::path model = "model/depth_anything_v2_large.onnx";
+    fs::path inputDir = "data/samples/multiview";
+    fs::path outputDir = "outputs/v5";
+    fs::path model = "models/depth_anything_v2_large.onnx";
     fs::path previewPly;
-    fs::path cacheDir = ".build/v5-depth-cache";
+    fs::path cacheDir = ".cache/v5-depth-cache";
     float snapshotYaw = 55.f;
     float snapshotPitch = 25.f;
 };
@@ -2394,7 +2394,7 @@ static Config parseArgs(int argc, char **argv)
     if (cfg.maxGrid < 4 || cfg.maxGrid > 384 || cfg.inputLongSide < 140 || cfg.inputLongSide > 1036 ||
         cfg.threads < 1 || cfg.threads > 16 || !std::isfinite(cfg.depthScale) || cfg.depthScale <= 0 ||
         !std::isfinite(cfg.depthOffset) || !std::isfinite(cfg.rejectStrength) || cfg.rejectStrength <= 0)
-        throw std::runtime_error("Invalid grid/input-size/thread/depth settings; see V5_NOTES.md");
+        throw std::runtime_error("Invalid grid/input-size/thread/depth settings; see docs/usage.md");
     for (int j = 0; j < 5; ++j)
         if (!std::isfinite(cfg.viewScale[j]) || cfg.viewScale[j] <= 0 || !std::isfinite(cfg.viewOffset[j]))
             throw std::runtime_error("Invalid per-view scale/offset");

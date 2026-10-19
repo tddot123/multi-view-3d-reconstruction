@@ -2,12 +2,12 @@
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <iostream>
+#include <fstream>
+#include <unordered_map>
 #include <vector>
 #include <cstdint>
 #include <cfloat>
 #include <cmath>
-#include <climits>
-#include <algorithm>
 
 using namespace cv;
 using namespace std;
@@ -63,7 +63,25 @@ static vector<Vec3b> voxelCol;     // per-voxel color
 static vector<uint8_t> voxelVote;  // vote count (0..255)
 static vector<uint8_t> voxelSrc;   // bitmask: which view(s) wrote this voxel
 
+static vector<Vec3f> pointCloudPos;
+static vector<Vec3b> pointCloudCol;
+
 float cubeSize = 2.0f;
+
+// 导出每个视图像素对应的世界坐标：1=逐像素；2=每隔一行一列（减小 txt 体积）
+static const int COORD_EXPORT_STRIDE = 1;
+// 为 false 时跳过五视图 + unified 坐标 txt，避免每次运行长时间写盘；调试时再改为 true
+static const bool EXPORT_COORD_TXT = false;
+
+// true：逐像素→世界坐标点云（不做格内聚合）；false：原有体素管线。效果不好改回 false 即可
+static const bool USE_POINT_CLOUD = true;
+// 点云采样：1=逐像素（最密）；2=隔行隔列，减轻点数与绘制压力
+static const int POINT_CLOUD_STRIDE = 1;
+static const float POINT_CLOUD_POINT_SIZE = 2.0f;
+// 局部密度：半径 R 内（含自身）邻居数 < 阈值则删除，用于去掉孤立稀疏噪点；边界帘幕若仍很密可能不会被删，需调 R / 阈值或配合 mask
+static const bool POINT_CLOUD_DENSITY_FILTER = true;
+static const float POINT_CLOUD_DENSITY_RADIUS = 4.5f;       // 世界空间搜索半径
+static const int POINT_CLOUD_MIN_NEIGHBORS_IN_RADIUS = 12;   // 球内至少多少点才保留（含自己）
 
 enum class ViewId
 {
@@ -90,11 +108,6 @@ static inline bool inBounds(int x, int y, int z)
     return (x >= 0 && y >= 0 && z >= 0 &&
         x < GRID_X && y < GRID_Y && z < GRID_Z);
 }
-
-static void alignDepthSingleToGrid(const Mat& dF, const Mat& m, int gridExtent, Mat& out8U);
-static void buildView(ViewId id);
-static void removeIsolatedVoxels(int minNeighborCount);
-static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLargest);
 
 ////////////////////////////////////////////////////////
 // Camera（完全保留）
@@ -276,19 +289,6 @@ void alignImages()
     resize(rightImg, rightImg, Size(D, H));
     resize(maskRight, maskRight, rightImg.size());
 
-    // 真实 back/right：对立相机需水平翻转，使图左↔世界右与对侧视角一致
-    // （合成 back/right 已在上面 flip 或 clone 左图，不再翻）
-    if (hasRealBack)
-    {
-        flip(backImg, backImg, 1);
-        flip(maskBack, maskBack, 1);
-    }
-    if (hasRealRight)
-    {
-        flip(rightImg, rightImg, 1);
-        flip(maskRight, maskRight, 1);
-    }
-
     //////////////////////////////////////////////////////
     // ⭐新增：比例 GRID 计算（唯一核心新增）
     //////////////////////////////////////////////////////
@@ -297,7 +297,7 @@ void alignImages()
 // ⭐真正按图分辨率 + 自动缩放（最终推荐）
 //////////////////////////////////////////////////////
 
-    const int MAX_GRID = 256;
+    const int MAX_GRID = 128;
     // 体素数据结构已改为动态分配，可直接调大 MAX_GRID 提升精度
 
     int maxDim =
@@ -353,7 +353,7 @@ Mat runDepthAnything(Mat& inputImg)
 
     static Ort::Session session(
         env,
-        L"model/depth_anything_v2_large.onnx",
+        L"models/depth_anything_v2_large.onnx",
         opts);
 
     Mat img;
@@ -429,90 +429,7 @@ Mat runDepthAnything(Mat& inputImg)
     return safeDepth;
 }
 
-struct MaskedDepthRange
-{
-    float mn = FLT_MAX;
-    float mx = -FLT_MAX;
-    bool valid = false;
-};
-
-static MaskedDepthRange computeMaskedDepthRange(const Mat& d, const Mat& m)
-{
-    MaskedDepthRange r;
-    if (d.empty() || m.empty() || d.size() != m.size())
-        return r;
-
-    for (int y = 0; y < d.rows; y++)
-        for (int x = 0; x < d.cols; x++)
-        {
-            if (m.at<uchar>(y, x) == 0) continue;
-            float v = d.at<float>(y, x);
-            if (!std::isfinite(v)) continue;
-            r.mn = min(r.mn, v);
-            r.mx = max(r.mx, v);
-            r.valid = true;
-        }
-    return r;
-}
-
-// 去掉 mask 内深度两端离群（噪声常拉高 gmin/gmax），Pass2 用此算 n
-static MaskedDepthRange computeMaskedDepthRangeTrimmed(
-    const Mat& d, const Mat& m, float lowQ = 0.05f, float highQ = 0.95f)
-{
-    vector<float> vals;
-    vals.reserve((size_t)d.rows * (size_t)d.cols / 4);
-
-    for (int y = 0; y < d.rows; y++)
-        for (int x = 0; x < d.cols; x++)
-        {
-            if (m.at<uchar>(y, x) == 0) continue;
-            float v = d.at<float>(y, x);
-            if (!std::isfinite(v)) continue;
-            vals.push_back(v);
-        }
-
-    MaskedDepthRange r;
-    if (vals.empty()) return r;
-
-    sort(vals.begin(), vals.end());
-    const size_t n = vals.size();
-    const size_t iLo = (size_t)min((float)(n - 1), floor(lowQ * (float)(n - 1)));
-    const size_t iHi = (size_t)min((float)(n - 1), ceil(highQ * (float)(n - 1)));
-    r.mn = vals[iLo];
-    r.mx = vals[max(iLo, iHi)];
-    if (r.mx <= r.mn)
-    {
-        r.mn = vals.front();
-        r.mx = vals.back();
-    }
-    r.valid = true;
-    return r;
-}
-
-// uchar=0 保留为「无 depth」；有效 coord∈[0,maxIdx] 映射到 uchar∈[1,255]，避免最浅点被当成空
-static const uchar DEPTH_U8_EMPTY = 0;
-static const uchar DEPTH_U8_MIN = 1;
-static const uchar DEPTH_U8_MAX = 255;
-
-static uchar encodeDepthU8LowSide(float coord, int gridExtent)
-{
-    const float maxIdx = (float)max(0, gridExtent - 1);
-    coord = max(0.0f, min(maxIdx, coord));
-    const float u = (float)DEPTH_U8_MIN + coord * (float)(DEPTH_U8_MAX - DEPTH_U8_MIN) / max(1.0f, maxIdx);
-    return (uchar)max((float)DEPTH_U8_MIN, min((float)DEPTH_U8_MAX, u));
-}
-
-// 高侧视角（back/right）：coord 越小 uchar 越大
-static uchar encodeDepthU8HighSide(float coord, int gridExtent)
-{
-    const float maxIdx = (float)max(0, gridExtent - 1);
-    coord = max(0.0f, min(maxIdx, coord));
-    const float u = (float)DEPTH_U8_MIN + (maxIdx - coord) * (float)(DEPTH_U8_MAX - DEPTH_U8_MIN) / max(1.0f, maxIdx);
-    return (uchar)max((float)DEPTH_U8_MIN, min((float)DEPTH_U8_MAX, u));
-}
-
-// 第一遍：各视角独立拉满 0–255，仅用于粗建模（与 front 正确版本一致）
-static void normalizeDepthsProvisional(
+static void normalizeDepthsByAxis(
     const Mat& dFrontF, const Mat& mFront,
     const Mat& dBackF, const Mat& mBack,
     const Mat& dLeftF, const Mat& mLeft,
@@ -520,385 +437,77 @@ static void normalizeDepthsProvisional(
     const Mat& dTopF, const Mat& mTop,
     Mat& outFront8U, Mat& outBack8U, Mat& outLeft8U, Mat& outRight8U, Mat& outTop8U)
 {
-    alignDepthSingleToGrid(dFrontF, mFront, GRID_Z, outFront8U);
-    alignDepthSingleToGrid(dBackF, mBack, GRID_Z, outBack8U);
-    alignDepthSingleToGrid(dLeftF, mLeft, GRID_X, outLeft8U);
-    alignDepthSingleToGrid(dRightF, mRight, GRID_X, outRight8U);
-    alignDepthSingleToGrid(dTopF, mTop, GRID_Y, outTop8U);
-}
+    // 不同视角的 depth 表示的是不同轴（Z/X/Y），不能混在一个 gmin/gmax 里统一归一化
+    // - front/back: Z 轴
+    // - left/right: X 轴
+    // - top: Y 轴
 
-// 去噪体素在厚度轴上的 [mn,mx]；用分位数去掉贴边噪声（如 mx=255）
-static bool measureVoxelExtentPercentile(
-    uint8_t srcBit, int thicknessAxis, int& outMn, int& outMx,
-    float loQ = 0.05f, float hiQ = 0.95f)
-{
-    vector<int> coords;
-    coords.reserve(4096);
-
-    for (int x = 0; x < GRID_X; x++)
-        for (int y = 0; y < GRID_Y; y++)
-            for (int z = 0; z < GRID_Z; z++)
-            {
-                const int idx = voxelIndex(x, y, z);
-                if (!voxelOcc[idx]) continue;
-                if ((voxelSrc[idx] & srcBit) == 0) continue;
-
-                int c = x;
-                if (thicknessAxis == 1) c = y;
-                else if (thicknessAxis == 2) c = z;
-                coords.push_back(c);
-            }
-
-    if (coords.empty()) return false;
-
-    sort(coords.begin(), coords.end());
-    const size_t n = coords.size();
-    const size_t iLo = (size_t)min((float)(n - 1), floor(loQ * (float)(n - 1)));
-    const size_t iHi = (size_t)min((float)(n - 1), ceil(hiQ * (float)(n - 1)));
-    outMn = coords[iLo];
-    outMx = coords[max(iLo, iHi)];
-    if (outMx <= outMn) { outMn = coords.front(); outMx = coords.back(); }
-    return true;
-}
-
-static bool measureVoxelExtent(uint8_t srcBit, int thicknessAxis, int& outMn, int& outMx)
-{
-    return measureVoxelExtentPercentile(srcBit, thicknessAxis, outMn, outMx);
-}
-
-static float measureVoxelThickness(uint8_t srcBit, int thicknessAxis)
-{
-    int mn = 0, mx = 0;
-    if (!measureVoxelExtent(srcBit, thicknessAxis, mn, mx))
-        return -1.0f;
-    return (float)(mx - mn + 1);
-}
-
-// meet 接缝比例：去噪 depth 壳层厚度
-static void thicknessForMeetPair(
-    float voxelTLow, float voxelTHigh,
-    float& outLow, float& outHigh)
-{
-    outLow = (voxelTLow > 0.0f) ? voxelTLow : 1.0f;
-    outHigh = (voxelTHigh > 0.0f) ? voxelTHigh : 1.0f;
-
-    const float avg = (outLow + outHigh) * 0.5f;
-    const float relDiff = fabs(outLow - outHigh) / max(avg, 1e-6f);
-
-    if (relDiff < 0.35f)
-    {
-        cout << "    meet pair denoised depth L=" << outLow << " R=" << outHigh
-            << " -> symmetric " << avg << endl;
-        outLow = outHigh = avg;
-    }
-    else
-    {
-        cout << "    meet pair denoised depth L=" << outLow << " R=" << outHigh << endl;
-    }
-}
-
-// Pass1 uchar -> 体素轴坐标（与 buildView 解码一致）；u=0 表示无效
-static float provToAxisCoord(uchar u, int gridExtent, bool highSideCodec)
-{
-    if (u == DEPTH_U8_EMPTY)
-        return -1.0f;
-
-    const float maxIdx = (float)max(0, gridExtent - 1);
-    const float t = ((float)u - (float)DEPTH_U8_MIN) * maxIdx / (float)(DEPTH_U8_MAX - DEPTH_U8_MIN);
-    if (highSideCodec)
-        return maxIdx - t;
-    return t;
-}
-
-static void encodeAxisCoord(float coord, int gridExtent, bool highSideCodec, uchar& outU)
-{
-    if (highSideCodec)
-        outU = encodeDepthU8HighSide(coord, gridExtent);
-    else
-        outU = encodeDepthU8LowSide(coord, gridExtent);
-}
-
-// 仿射伸缩；输入=去噪 depth；extent 外像素已在 extract 阶段置 0
-static void stretchProvView(
-    const Mat& prov8U, const Mat& m,
-    int gridExtent,
-    int voxMn, int voxMx,
-    float slabLo, float slabHi,
-    bool highSideCodec,
-    const char* dbgTag,
-    Mat& out8U)
-{
-    out8U = Mat();
-    if (prov8U.empty() || voxMx <= voxMn) return;
-
-    const float maxIdx = (float)max(0, gridExtent - 1);
-    const float srcMn = (float)voxMn;
-    const float srcMx = (float)voxMx;
-    const float srcSpan = max(1e-4f, srcMx - srcMn);
-    const float dstSpan = slabHi - slabLo;
-    const float gridMid = 0.5f * maxIdx;
-    const float centroid = 0.5f * (srcMn + srcMx);
-    // front/left 壳在轴高端需 invert；back/right 壳在轴低端也需 invert（内外侧才能 meet↔maxIdx）
-    const bool invert = highSideCodec ? (centroid < gridMid) : (centroid > gridMid);
-
-    int kept = 0;
-    int skipped = 0;
-
-    out8U = Mat::zeros(prov8U.size(), CV_8U);
-    for (int y = 0; y < prov8U.rows; y++)
-        for (int x = 0; x < prov8U.cols; x++)
+    auto computeMinMax = [&](const Mat& dA, const Mat& mA, const Mat& dB, const Mat& mB, float& mn, float& mx)
         {
-            if (!m.empty() && m.at<uchar>(y, x) == 0) continue;
-            const uchar uIn = prov8U.at<uchar>(y, x);
-            if (uIn == DEPTH_U8_EMPTY) continue;
-            float coord = provToAxisCoord(uIn, gridExtent, highSideCodec);
-            if (coord < 0.0f) continue;
-
-            if (coord < srcMn || coord > srcMx)
-            {
-                // 略低于 P5 的最浅像素：钳到 srcMn 参与 stretch，避免起始段被 skip
-                if (coord < srcMn)
-                    coord = srcMn;
-                else
+            mn = FLT_MAX;
+            mx = -FLT_MAX;
+            auto scan = [&](const Mat& d, const Mat& m)
                 {
-                    skipped++;
-                    continue;
-                }
+                    if (d.empty() || m.empty()) return;
+                    for (int y = 0; y < d.rows; y++)
+                        for (int x = 0; x < d.cols; x++)
+                        {
+                            if (m.at<uchar>(y, x) == 0) continue;
+                            float v = d.at<float>(y, x);
+                            if (!std::isfinite(v)) continue;
+                            mn = min(mn, v);
+                            mx = max(mx, v);
+                        }
+                };
+            scan(dA, mA);
+            scan(dB, mB);
+        };
+
+    auto toU8Range = [&](const Mat& d, float mn, float mx, Mat& out)
+        {
+            if (d.empty()) { out = Mat(); return; }
+            if (!(mx > mn))
+            {
+                Mat tmp8;
+                normalize(d, tmp8, 0, 255, NORM_MINMAX);
+                tmp8.convertTo(out, CV_8U);
+                return;
             }
 
-            float coordNew;
-            if (invert)
-                coordNew = slabHi - (coord - srcMn) * dstSpan / srcSpan;
-            else
-                coordNew = slabLo + (coord - srcMn) * dstSpan / srcSpan;
+            Mat tmp(d.size(), CV_8U);
+            const float scale = 255.0f / (mx - mn);
+            for (int y = 0; y < d.rows; y++)
+                for (int x = 0; x < d.cols; x++)
+                {
+                    float v = d.at<float>(y, x);
+                    if (!std::isfinite(v))
+                        tmp.at<uchar>(y, x) = 0;
+                    else
+                    {
+                        float n = (v - mn) * scale;
+                        n = max(0.0f, min(255.0f, n));
+                        tmp.at<uchar>(y, x) = (uchar)(n);
+                    }
+                }
+            out = tmp;
+        };
 
-            coordNew = max(slabLo, min(slabHi, coordNew));
-            coordNew = max(0.0f, min(maxIdx, coordNew));
-            encodeAxisCoord(coordNew, gridExtent, highSideCodec, out8U.at<uchar>(y, x));
-            kept++;
-        }
+    // Z group
+    float zMin, zMax;
+    computeMinMax(dFrontF, mFront, dBackF, mBack, zMin, zMax);
+    toU8Range(dFrontF, zMin, zMax, outFront8U);
+    toU8Range(dBackF, zMin, zMax, outBack8U);
 
-    if (dbgTag)
-        cout << "    " << dbgTag << " shell kept=" << kept << " skipped(outside denoised extent)=" << skipped << endl;
-}
+    // X group
+    float xMin, xMax;
+    computeMinMax(dLeftF, mLeft, dRightF, mRight, xMin, xMax);
+    toU8Range(dLeftF, xMin, xMax, outLeft8U);
+    toU8Range(dRightF, xMin, xMax, outRight8U);
 
-// 从 Pass1 粗 depth + 去噪体素 extent 提取壳层 → 去噪 depth（extent 外置 0）
-static void extractDenoisedShellDepth(
-    const Mat& pass1Depth8U, const Mat& mask,
-    uint8_t srcBit, int thicknessAxis, bool highSideCodec,
-    Mat& outDenoised8U)
-{
-    outDenoised8U = Mat();
-    if (pass1Depth8U.empty()) return;
-
-    int mn = 0, mx = 0;
-    // loQ=0 保留最浅壳层；hiQ=0.95 去掉高端噪声（全范围会把 mx 拉到 255 导致 Pass2 过度压缩）
-    if (!measureVoxelExtentPercentile(srcBit, thicknessAxis, mn, mx, 0.0f, 0.95f))
-    {
-        outDenoised8U = Mat::zeros(pass1Depth8U.size(), CV_8U);
-        return;
-    }
-
-    const float srcMn = (float)mn;
-    const float srcMx = (float)mx;
-    const int gridExtent = (thicknessAxis == 2) ? GRID_Z : ((thicknessAxis == 0) ? GRID_X : GRID_Y);
-
-    outDenoised8U = Mat::zeros(pass1Depth8U.size(), CV_8U);
-    for (int y = 0; y < pass1Depth8U.rows; y++)
-        for (int x = 0; x < pass1Depth8U.cols; x++)
-        {
-            if (!mask.empty() && mask.at<uchar>(y, x) == 0) continue;
-            const uchar u = pass1Depth8U.at<uchar>(y, x);
-            if (u == DEPTH_U8_EMPTY) continue;
-            const float coord = provToAxisCoord(u, gridExtent, highSideCodec);
-            if (coord < 0.0f) continue;
-            if (coord > srcMx) continue;
-            // 低于体素 extent 下限的最浅像素仍保留（起始段）
-            outDenoised8U.at<uchar>(y, x) = u;
-        }
-}
-
-// 去噪 depth 在轴上的 extent
-// loQ=0：保留最浅点（起始部分）；hiQ=0.95：裁掉高端离群噪声，避免 stretch 被压扁
-static bool measureDenoisedDepthExtent(
-    const Mat& den8U, const Mat& mask,
-    int gridExtent, bool highSideCodec,
-    int& outMn, int& outMx,
-    float loQ = 0.0f, float hiQ = 0.95f)
-{
-    vector<float> coords;
-    if (den8U.empty()) return false;
-
-    coords.reserve((size_t)den8U.rows * (size_t)den8U.cols / 8);
-    for (int y = 0; y < den8U.rows; y++)
-        for (int x = 0; x < den8U.cols; x++)
-        {
-            if (!mask.empty() && mask.at<uchar>(y, x) == 0) continue;
-            const uchar u = den8U.at<uchar>(y, x);
-            if (u == DEPTH_U8_EMPTY) continue;
-            const float c = provToAxisCoord(u, gridExtent, highSideCodec);
-            if (c < 0.0f) continue;
-            coords.push_back(c);
-        }
-
-    if (coords.empty()) return false;
-
-    sort(coords.begin(), coords.end());
-    const size_t n = coords.size();
-    const size_t iLo = (size_t)min((float)(n - 1), floor(loQ * (float)(n - 1)));
-    const size_t iHi = (size_t)min((float)(n - 1), ceil(hiQ * (float)(n - 1)));
-    outMn = (int)floor(coords[iLo]);
-    outMx = (int)ceil(coords[max(iLo, iHi)]);
-    if (outMx <= outMn)
-    {
-        outMn = (int)floor(coords.front());
-        outMx = (int)ceil(coords.back());
-    }
-    return true;
-}
-
-static float measureDenoisedDepthThickness(
-    const Mat& den8U, const Mat& mask,
-    int gridExtent, bool highSideCodec)
-{
-    int mn = 0, mx = 0;
-    // meet 比例仍用 P5–P95 厚度，不受 stretch 范围影响
-    if (!measureDenoisedDepthExtent(den8U, mask, gridExtent, highSideCodec, mn, mx, 0.05f, 0.95f))
-        return -1.0f;
-    return (float)(mx - mn + 1);
-}
-
-static void stretchDepthPairFromDenoised(
-    const Mat& denLow, const Mat& mLow,
-    const Mat& denHigh, const Mat& mHigh,
-    int gridExtent,
-    bool highSideLow, bool highSideHigh,
-    const char* axisName,
-    Mat& outLow8U, Mat& outHigh8U)
-{
-    outLow8U = Mat();
-    outHigh8U = Mat();
-
-    const float tLow = measureDenoisedDepthThickness(denLow, mLow, gridExtent, highSideLow);
-    const float tHigh = measureDenoisedDepthThickness(denHigh, mHigh, gridExtent, highSideHigh);
-    if (tLow <= 0.0f && tHigh <= 0.0f) return;
-
-    float tL = (tLow > 0.0f) ? tLow : tHigh;
-    float tH = (tHigh > 0.0f) ? tHigh : tLow;
-
-    float meetLow = 0.0f, meetHigh = 0.0f;
-    thicknessForMeetPair(tL, tH, meetLow, meetHigh);
-    (void)meetLow;
-
-    const float total = meetLow + meetHigh;
-    const float maxIdx = (float)max(0, gridExtent - 1);
-    const float meet = maxIdx * (meetLow / total);
-
-    int mnL = 0, mxL = 0, mnH = 0, mxH = 0;
-    const bool hasL = measureDenoisedDepthExtent(denLow, mLow, gridExtent, highSideLow, mnL, mxL);
-    const bool hasH = measureDenoisedDepthExtent(denHigh, mHigh, gridExtent, highSideHigh, mnH, mxH);
-
-    const bool invertL = hasL && (0.5f * (float)(mnL + mxL)) > (0.5f * maxIdx);
-    const bool invertH = hasH && (0.5f * (float)(mnH + mxH)) < (0.5f * maxIdx);
-
-    cout << "  [" << axisName << "] meet=" << meet
-        << " denoised-depth L[" << mnL << "," << mxL << "] H[" << mnH << "," << mxH << "]"
-        << " invert L=" << (invertL ? 1 : 0) << " H=" << (invertH ? 1 : 0) << endl;
-
-    if (hasL && mxL > mnL && !denLow.empty())
-        stretchProvView(denLow, mLow, gridExtent, mnL, mxL, 0.0f, meet, highSideLow, axisName, outLow8U);
-
-    if (hasH && mxH > mnH && !denHigh.empty())
-    {
-        const char* tagH = (axisName[0] == 'Z') ? "Z-back" : "X-right";
-        stretchProvView(denHigh, mHigh, gridExtent, mnH, mxH, meet, maxIdx, highSideHigh, tagH, outHigh8U);
-    }
-}
-
-static void denoiseVoxels()
-{
-    removeIsolatedVoxels(4);
-    keepConnectedComponentsBySize(200, 0.03f);
-}
-
-// 单视角（top）：拉伸至整轴高度 GRID_Y
-static void alignDepthSingleToGrid(
-    const Mat& dF, const Mat& m,
-    int gridExtent,
-    Mat& out8U)
-{
-    out8U = Mat();
-    if (dF.empty()) return;
-
-    const MaskedDepthRange r = computeMaskedDepthRange(dF, m);
-    if (!r.valid)
-    {
-        Mat tmp8;
-        normalize(dF, tmp8, 0, 255, NORM_MINMAX);
-        tmp8.convertTo(out8U, CV_8U);
-        return;
-    }
-
-    const float span = max(r.mx - r.mn, 1e-6f);
-    const float maxIdx = (float)max(0, gridExtent - 1);
-
-    out8U = Mat::zeros(dF.size(), CV_8U);
-    for (int y = 0; y < dF.rows; y++)
-        for (int x = 0; x < dF.cols; x++)
-        {
-            if (!m.empty() && m.at<uchar>(y, x) == 0) continue;
-            float v = dF.at<float>(y, x);
-            if (!std::isfinite(v)) continue;
-            const float n = (v - r.mn) / span;
-            const float coord = n * maxIdx;
-            out8U.at<uchar>(y, x) = encodeDepthU8LowSide(coord, gridExtent);
-        }
-}
-
-// Pass2：meet + 仿射伸缩；输入/范围/extent/厚度 全部来自去噪 depth
-static void normalizeDepthsFromDenoisedShell(
-    const Mat& denFront, const Mat& denBack,
-    const Mat& denLeft, const Mat& denRight,
-    const Mat& denTop,
-    Mat& outFront8U, Mat& outBack8U, Mat& outLeft8U, Mat& outRight8U, Mat& outTop8U)
-{
-    cout << "=== Pass2: stretch denoised depth -> meet slab ===" << endl;
-
-    const float vZF = measureDenoisedDepthThickness(denFront, maskFront, GRID_Z, false);
-    const float vZB = measureDenoisedDepthThickness(denBack, maskBack, GRID_Z, true);
-    const float vXL = measureDenoisedDepthThickness(denLeft, maskLeft, GRID_X, false);
-    const float vXR = measureDenoisedDepthThickness(denRight, maskRight, GRID_X, true);
-    cout << "  denoised depth span: Z front=" << vZF << " back=" << vZB
-        << " X left=" << vXL << " right=" << vXR << endl;
-
-    stretchDepthPairFromDenoised(
-        denFront, maskFront, denBack, maskBack,
-        GRID_Z, false, true, "Z",
-        outFront8U, outBack8U);
-
-    stretchDepthPairFromDenoised(
-        denLeft, maskLeft, denRight, maskRight,
-        GRID_X, false, true, "X",
-        outLeft8U, outRight8U);
-
-    int yMn = 0, yMx = 0;
-    if (measureDenoisedDepthExtent(denTop, maskTop, GRID_Y, false, yMn, yMx) && !denTop.empty())
-    {
-        const float maxIdx = (float)max(0, GRID_Y - 1);
-        stretchProvView(denTop, maskTop, GRID_Y, yMn, yMx, 0.0f, maxIdx, false, "Y-top", outTop8U);
-    }
-
-    cout << "=== Pass2 done ===" << endl;
-}
-
-// 粗建 + 去噪 + 按体素厚度重映射 + 精建
-static void buildAllViewsForThicknessProbe()
-{
-    buildView(ViewId::Front);
-    buildView(ViewId::Back);
-    buildView(ViewId::Left);
-    buildView(ViewId::Right);
-    buildView(ViewId::Top);
+    // Y group (top only)
+    float yMin = FLT_MAX, yMax = -FLT_MAX;
+    computeMinMax(dTopF, mTop, Mat(), Mat(), yMin, yMax);
+    toU8Range(dTopF, yMin, yMax, outTop8U);
 }
 
 static void saveDepthDebug(const char* filename, const Mat& depth8U)
@@ -907,9 +516,8 @@ static void saveDepthDebug(const char* filename, const Mat& depth8U)
     imwrite(filename, depth8U);
 }
 
-static std::string makeDepthDebugPath(const std::string& inputImagePath, const char* dirName)
+static std::string inputPathToStem(const std::string& inputImagePath)
 {
-    // Avoid std::filesystem (requires C++17); do simple path/stem parse.
     std::string name = inputImagePath;
     const size_t slash = name.find_last_of("/\\");
     if (slash != std::string::npos)
@@ -919,8 +527,210 @@ static std::string makeDepthDebugPath(const std::string& inputImagePath, const c
     const size_t dot = stem.find_last_of('.');
     if (dot != std::string::npos)
         stem = stem.substr(0, dot);
+    return stem;
+}
 
-    return std::string("output/") + stem + "_depth_" + std::string(dirName) + ".png";
+static std::string makeDepthDebugPath(const std::string& inputImagePath, const char* dirName)
+{
+    const std::string stem = inputPathToStem(inputImagePath);
+    return std::string("outputs/") + stem + "_depth_" + std::string(dirName) + ".png";
+}
+
+// 与深度图同目录、同名 stem：output/{stem}_coords_{view}.txt
+static std::string makeCoordsDebugPath(const std::string& inputImagePath, const char* viewName)
+{
+    const std::string stem = inputPathToStem(inputImagePath);
+    return std::string("outputs/") + stem + "_coords_" + std::string(viewName) + ".txt";
+}
+
+static std::string makeUnifiedVoxelOutPath(const std::string& frontInputPath)
+{
+    const std::string stem = inputPathToStem(frontInputPath);
+    return std::string("outputs/") + stem + "_unified_voxels_world.txt";
+}
+
+// 与 buildView 中单像素映射一致（未做投影聚合）
+static void mapPixelToVoxelGrid(ViewId id, int px, int py, int w, int h, uchar d,
+    int& vx, int& vy, int& vz)
+{
+    int a = 0, b = 0;
+    switch (id)
+    {
+    case ViewId::Front:
+    case ViewId::Back:
+        a = px * GRID_X / w;
+        b = (h - py - 1) * GRID_Y / h;
+        break;
+    case ViewId::Left:
+    case ViewId::Right:
+        a = px * GRID_Z / w;
+        b = (h - py - 1) * GRID_Y / h;
+        break;
+    case ViewId::Top:
+        a = px * GRID_X / w;
+        b = py * GRID_Z / h;
+        break;
+    }
+
+    switch (id)
+    {
+    case ViewId::Front:
+        vx = a; vy = b;
+        vz = (int)d * GRID_Z / 255;
+        break;
+    case ViewId::Back:
+        vx = a; vy = b;
+        vz = GRID_Z - (int)d * GRID_Z / 255 - 1;
+        break;
+    case ViewId::Left:
+        vz = a; vy = b;
+        vx = (int)d * GRID_X / 255;
+        break;
+    case ViewId::Right:
+        vz = a; vy = b;
+        vx = GRID_X - (int)d * GRID_X / 255 - 1;
+        break;
+    case ViewId::Top:
+        vx = a; vz = b;
+    {
+        int vy0 = (int)d * GRID_Y / 255;
+        int yTop = GRID_Y - 1;
+        vy = yTop - (int)(yTop - vy0);
+    }
+        break;
+    }
+
+    vx = min(GRID_X - 1, max(0, vx));
+    vy = min(GRID_Y - 1, max(0, vy));
+    vz = min(GRID_Z - 1, max(0, vz));
+}
+
+static void voxelGridToWorld(int vx, int vy, int vz, float& wx, float& wy, float& wz)
+{
+    const float offX = GRID_X / 2.0f;
+    const float offY = GRID_Y / 2.0f;
+    const float offZ = 0.0f;
+    wx = (vx - offX) * cubeSize;
+    wy = (vy - offY) * cubeSize;
+    wz = (vz - offZ) * cubeSize;
+}
+
+static const char* viewIdTag(ViewId id)
+{
+    switch (id)
+    {
+    case ViewId::Front: return "front";
+    case ViewId::Back: return "back";
+    case ViewId::Left: return "left";
+    case ViewId::Right: return "right";
+    case ViewId::Top: return "top";
+    default: return "?";
+    }
+}
+
+// 各视图尚未融合前：逐像素 depth8U + 颜色 -> 体素网格索引 + 与 OpenGL drawVoxel 一致的世界坐标
+static void exportViewPixelWorldCoords(ViewId id, const std::string& coordsOutPath,
+    const Mat& depth8u, const Mat& img, const Mat& mask)
+{
+    std::ofstream out(coordsOutPath.c_str());
+    if (!out)
+    {
+        cerr << "Cannot write coords file: " << coordsOutPath << endl;
+        return;
+    }
+
+    out << "# per-view BEFORE fusion (same mapping as buildView single-pixel path)\n";
+    out << "# view=" << viewIdTag(id)
+        << " GRID_X=" << GRID_X << " GRID_Y=" << GRID_Y << " GRID_Z=" << GRID_Z
+        << " cubeSize=" << cubeSize << "\n";
+    switch (id)
+    {
+    case ViewId::Front:
+        out << "# axis(grid): px->gx, (flip py)->gy, depth_u8->gz\n";
+        break;
+    case ViewId::Back:
+        out << "# axis(grid): px->gx, (flip py)->gy, depth_u8 inverted->gz\n";
+        break;
+    case ViewId::Left:
+        out << "# axis(grid): px->gz, (flip py)->gy, depth_u8->gx\n";
+        break;
+    case ViewId::Right:
+        out << "# axis(grid): px->gz, (flip py)->gy, depth_u8 mirrored->gx\n";
+        break;
+    case ViewId::Top:
+        out << "# axis(grid): px->gx, py->gz, depth_u8->gy\n";
+        break;
+    }
+    out << "# columns: px py depth_u8 gx gy gz wx wy wz B G R\n";
+
+    if (depth8u.empty() || img.empty() || mask.empty())
+    {
+        out << "# empty depth/img/mask\n";
+        return;
+    }
+
+    const int w = depth8u.cols;
+    const int h = depth8u.rows;
+    if (w != img.cols || h != img.rows || w != mask.cols || h != mask.rows)
+    {
+        out << "# ERROR size mismatch depth/img/mask\n";
+        return;
+    }
+
+    for (int py = 0; py < h; py += COORD_EXPORT_STRIDE)
+        for (int px = 0; px < w; px += COORD_EXPORT_STRIDE)
+        {
+            if (mask.at<uchar>(py, px) == 0)
+                continue;
+
+            const uchar du = depth8u.at<uchar>(py, px);
+            const Vec3b c = img.at<Vec3b>(py, px);
+
+            int gx = 0, gy = 0, gz = 0;
+            mapPixelToVoxelGrid(id, px, py, w, h, du, gx, gy, gz);
+
+            float wx = 0, wy = 0, wz = 0;
+            voxelGridToWorld(gx, gy, gz, wx, wy, wz);
+
+            out << px << ' ' << py << ' ' << (int)du << ' '
+                << gx << ' ' << gy << ' ' << gz << ' '
+                << wx << ' ' << wy << ' ' << wz << ' '
+                << (int)c[0] << ' ' << (int)c[1] << ' ' << (int)c[2] << '\n';
+        }
+}
+
+// 融合与滤波之后：占用体素的统一世界坐标（与 drawVoxel 一致）
+static void exportUnifiedOccupiedVoxelsWorld(const std::string& outPath)
+{
+    std::ofstream out(outPath.c_str());
+    if (!out)
+    {
+        cerr << "Cannot write unified voxel file: " << outPath << endl;
+        return;
+    }
+
+    out << "# AFTER fusion/post-process: occupied voxels in unified world frame (same as OpenGL)\n";
+    out << "# GRID_X=" << GRID_X << " GRID_Y=" << GRID_Y << " GRID_Z=" << GRID_Z
+        << " cubeSize=" << cubeSize << "\n";
+    out << "# columns: gx gy gz wx wy wz B G R voxelSrc_bits\n";
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                const int idx = voxelIndex(x, y, z);
+                if (!voxelOcc[idx])
+                    continue;
+
+                float wx = 0, wy = 0, wz = 0;
+                voxelGridToWorld(x, y, z, wx, wy, wz);
+
+                const Vec3b c = voxelCol[idx];
+                out << x << ' ' << y << ' ' << z << ' '
+                    << wx << ' ' << wy << ' ' << wz << ' '
+                    << (int)c[0] << ' ' << (int)c[1] << ' ' << (int)c[2] << ' '
+                    << (int)voxelSrc[idx] << '\n';
+            }
 }
 
 ////////////////////////////////////////////////////////
@@ -1135,7 +945,7 @@ static void buildView(ViewId id)
     int aSize = 0;
     int bSize = 0;
     int thicknessAxis = 2; // 0->x,1->y,2->z
-    const int thickness = 2;
+    const int thickness = 0;
 
     switch (id)
     {
@@ -1182,9 +992,6 @@ static void buildView(ViewId id)
                 continue;
 
             const uchar d = depth->at<uchar>(py, px);
-            if (d == DEPTH_U8_EMPTY)
-                continue;
-
             const Vec3b c = img->at<Vec3b>(py, px);
 
             int a = 0;
@@ -1250,23 +1057,27 @@ static void buildView(ViewId id)
             {
             case ViewId::Front:
                 vx = a; vy = b;
-                vz = (int)(provToAxisCoord((uchar)avgDepth, GRID_Z, false) + 0.5f);
+                vz = avgDepth * GRID_Z / 255;
                 break;
             case ViewId::Back:
                 vx = a; vy = b;
-                vz = (int)(provToAxisCoord((uchar)avgDepth, GRID_Z, true) + 0.5f);
+                vz = GRID_Z - avgDepth * GRID_Z / 255 - 1;
                 break;
             case ViewId::Left:
                 vz = a; vy = b;
-                vx = (int)(provToAxisCoord((uchar)avgDepth, GRID_X, false) + 0.5f);
+                vx = avgDepth * GRID_X / 255;
                 break;
             case ViewId::Right:
                 vz = a; vy = b;
-                vx = (int)(provToAxisCoord((uchar)avgDepth, GRID_X, true) + 0.5f);
+                vx = GRID_X - avgDepth * GRID_X / 255 - 1;
                 break;
             case ViewId::Top:
                 vx = a; vz = b;
-                vy = (int)(provToAxisCoord((uchar)avgDepth, GRID_Y, false) + 0.5f);
+                {
+                    int vy0 = avgDepth * GRID_Y / 255;
+                    int yTop = GRID_Y - 1;
+                    vy = yTop - (int)(yTop - vy0);
+                }
                 break;
             }
 
@@ -1298,6 +1109,155 @@ static void buildView(ViewId id)
         }
     removeIsolatedVoxels(4);
     keepConnectedComponentsBySize(200, 0.03f);
+}
+
+// 逐像素深度 + 颜色 → 与 mapPixelToVoxelGrid / voxelGridToWorld 一致的世界坐标（无格内平均）
+static void clearPointCloud()
+{
+    pointCloudPos.clear();
+    pointCloudCol.clear();
+}
+
+static void buildPointCloudView(ViewId id)
+{
+    const Mat* depth = nullptr;
+    const Mat* img = nullptr;
+    const Mat* mask = nullptr;
+
+    switch (id)
+    {
+    case ViewId::Front:
+        depth = &depthFront; img = &frontImg; mask = &maskFront;
+        break;
+    case ViewId::Back:
+        depth = &depthBack; img = &backImg; mask = &maskBack;
+        break;
+    case ViewId::Left:
+        depth = &depthLeft; img = &leftImg; mask = &maskLeft;
+        break;
+    case ViewId::Right:
+        depth = &depthRight; img = &rightImg; mask = &maskRight;
+        break;
+    case ViewId::Top:
+        depth = &depthTop; img = &topImg; mask = &maskTop;
+        break;
+    }
+
+    if (!depth || depth->empty() || !img || img->empty() || !mask || mask->empty())
+        return;
+
+    const int w = depth->cols;
+    const int h = depth->rows;
+    if (w != img->cols || h != img->rows || w != mask->cols || h != mask->rows)
+        return;
+
+    const int stride = max(1, POINT_CLOUD_STRIDE);
+    pointCloudPos.reserve(pointCloudPos.size() + (size_t)(w / stride) * (h / stride));
+    pointCloudCol.reserve(pointCloudCol.size() + (size_t)(w / stride) * (h / stride));
+
+    for (int py = 0; py < h; py += stride)
+        for (int px = 0; px < w; px += stride)
+        {
+            if (mask->at<uchar>(py, px) == 0)
+                continue;
+
+            const uchar du = depth->at<uchar>(py, px);
+            const Vec3b c = img->at<Vec3b>(py, px);
+
+            int gx = 0, gy = 0, gz = 0;
+            mapPixelToVoxelGrid(id, px, py, w, h, du, gx, gy, gz);
+
+            float wx = 0, wy = 0, wz = 0;
+            voxelGridToWorld(gx, gy, gz, wx, wy, wz);
+
+            pointCloudPos.push_back(Vec3f(wx, wy, wz));
+            pointCloudCol.push_back(c);
+        }
+}
+
+static inline uint64_t packGridCell(int ix, int iy, int iz)
+{
+    const int B = 1000000;
+    uint64_t a = (uint32_t)(ix + B);
+    uint64_t b = (uint32_t)(iy + B);
+    uint64_t c = (uint32_t)(iz + B);
+    return (a << 42) | (b << 21) | c;
+}
+
+// 球邻域计数 + 空间哈希；剔除「局部密度过低」的点
+static void filterPointCloudByLocalDensity()
+{
+    if (!POINT_CLOUD_DENSITY_FILTER || pointCloudPos.empty())
+        return;
+
+    const float R = POINT_CLOUD_DENSITY_RADIUS;
+    if (!(R > 0.0f))
+        return;
+
+    const float R2 = R * R;
+    const float cell = R;
+    const int minK = max(1, POINT_CLOUD_MIN_NEIGHBORS_IN_RADIUS);
+
+    unordered_map<uint64_t, vector<size_t>> buckets;
+    buckets.reserve(pointCloudPos.size() / 8 + 16);
+
+    for (size_t i = 0; i < pointCloudPos.size(); i++)
+    {
+        const Vec3f& p = pointCloudPos[i];
+        const int ix = (int)floor(p[0] / cell);
+        const int iy = (int)floor(p[1] / cell);
+        const int iz = (int)floor(p[2] / cell);
+        buckets[packGridCell(ix, iy, iz)].push_back(i);
+    }
+
+    vector<uint8_t> keep(pointCloudPos.size(), 0);
+
+    for (size_t i = 0; i < pointCloudPos.size(); i++)
+    {
+        const Vec3f& p = pointCloudPos[i];
+        const int ix = (int)floor(p[0] / cell);
+        const int iy = (int)floor(p[1] / cell);
+        const int iz = (int)floor(p[2] / cell);
+
+        int cnt = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    const auto it = buckets.find(packGridCell(ix + dx, iy + dy, iz + dz));
+                    if (it == buckets.end())
+                        continue;
+                    for (size_t j : it->second)
+                    {
+                        const Vec3f& q = pointCloudPos[j];
+                        const float fx = p[0] - q[0];
+                        const float fy = p[1] - q[1];
+                        const float fz = p[2] - q[2];
+                        if (fx * fx + fy * fy + fz * fz <= R2)
+                            cnt++;
+                    }
+                }
+
+        keep[i] = (cnt >= minK) ? 1 : 0;
+    }
+
+    vector<Vec3f> newPos;
+    vector<Vec3b> newCol;
+    newPos.reserve(pointCloudPos.size());
+    newCol.reserve(pointCloudCol.size());
+    for (size_t i = 0; i < pointCloudPos.size(); i++)
+    {
+        if (!keep[i])
+            continue;
+        newPos.push_back(pointCloudPos[i]);
+        newCol.push_back(pointCloudCol[i]);
+    }
+
+    const size_t before = pointCloudPos.size();
+    pointCloudPos.swap(newPos);
+    pointCloudCol.swap(newCol);
+    cout << "Point cloud density filter: " << before << " -> " << pointCloudPos.size()
+        << " (R=" << R << ", minK=" << minK << ")" << endl;
 }
 
 ////////////////////////////////////////////////////////
@@ -1377,6 +1337,26 @@ void drawVoxel()
             }
 }
 
+static void drawPointCloud()
+{
+    if (pointCloudPos.empty())
+        return;
+
+    glPointSize(POINT_CLOUD_POINT_SIZE);
+    glBegin(GL_POINTS);
+    for (size_t i = 0; i < pointCloudPos.size(); i++)
+    {
+        const Vec3f& p = pointCloudPos[i];
+        const Vec3b& c = pointCloudCol[i];
+        glColor3f(
+            c[2] / 255.0f,
+            c[1] / 255.0f,
+            c[0] / 255.0f);
+        glVertex3f(p[0], p[1], p[2]);
+    }
+    glEnd();
+}
+
 void display()
 {
     glClear(
@@ -1392,7 +1372,10 @@ void display()
     glRotatef(angleX, 1, 0, 0);
     glRotatef(angleY, 0, 1, 0);
 
-    drawVoxel();
+    if (USE_POINT_CLOUD)
+        drawPointCloud();
+    else
+        drawVoxel();
 
     glutSwapBuffers();
 }
@@ -1457,11 +1440,11 @@ void motion(int x, int y)
 
 int main(int argc, char** argv)
 {
-    const std::string frontPath = "input/f08.png";
-    const std::string backPath = "input/b08.png";
-    const std::string leftPath = "input/l08.png";
-    const std::string rightPath = "input/r08.png";
-    const std::string topPath = "input/t08.png";
+    const std::string frontPath = "data/samples/multiview/front.png";
+    const std::string backPath = "data/samples/multiview/back.png";
+    const std::string leftPath = "data/samples/multiview/left.png";
+    const std::string rightPath = "data/samples/multiview/right.png";
+    const std::string topPath = "data/samples/multiview/top.png";
 
     frontImgRaw = imread(frontPath);
     backImgRaw = imread(backPath);
@@ -1519,8 +1502,6 @@ int main(int argc, char** argv)
 
     if (!hasRealBack)
         flip(depthFrontF, depthBackF, 1);
-    else if (!depthBackF.empty())
-        flip(depthBackF, depthBackF, 1);
 
     if (!depthRightF.empty())
     {
@@ -1528,17 +1509,14 @@ int main(int argc, char** argv)
         {
             depthRightF = depthLeftF.clone();
         }
-        else
+        else if (depthRightF.size() != rightImg.size())
         {
-            if (depthRightF.size() != rightImg.size())
-                resize(depthRightF, depthRightF, rightImg.size());
-            flip(depthRightF, depthRightF, 1);
+            resize(depthRightF, depthRightF, rightImg.size());
         }
     }
 
-    // Pass1：原始 float depth → 粗 depth → 粗建模 → 去噪
-    cout << "=== Pass1: raw depth -> coarse model -> denoise ===" << endl;
-    normalizeDepthsProvisional(
+    // Axis-wise normalization to keep consistent geometry
+    normalizeDepthsByAxis(
         depthFrontF, maskFront,
         depthBackF, maskBack,
         depthLeftF, maskLeft,
@@ -1546,26 +1524,7 @@ int main(int argc, char** argv)
         depthTopF, maskTop,
         depthFront, depthBack, depthLeft, depthRight, depthTop);
 
-    initVoxel();
-    buildAllViewsForThicknessProbe();
-    denoiseVoxels();
-
-    // 得到去噪 depth：仅保留去噪体素壳层内的 Pass1 depth，extent 外为 0
-    cout << "=== Extract denoised shell depth ===" << endl;
-    Mat depthFrontDen, depthBackDen, depthLeftDen, depthRightDen, depthTopDen;
-    extractDenoisedShellDepth(depthFront, maskFront, SRC_FRONT, 2, false, depthFrontDen);
-    extractDenoisedShellDepth(depthBack, maskBack, SRC_BACK, 2, true, depthBackDen);
-    extractDenoisedShellDepth(depthLeft, maskLeft, SRC_LEFT, 0, false, depthLeftDen);
-    extractDenoisedShellDepth(depthRight, maskRight, SRC_RIGHT, 0, true, depthRightDen);
-    extractDenoisedShellDepth(depthTop, maskTop, SRC_TOP, 1, false, depthTopDen);
-
-    // Pass2：全部基于去噪 depth 做 meet 伸缩 → 规范化 depth
-    normalizeDepthsFromDenoisedShell(
-        depthFrontDen, depthBackDen,
-        depthLeftDen, depthRightDen,
-        depthTopDen,
-        depthFront, depthBack, depthLeft, depthRight, depthTop);
-
+    // 保存5张深度图到当前目录（便于观察）
     const std::string outFront = makeDepthDebugPath(frontPath, "front");
     const std::string outBack = makeDepthDebugPath(backPath, "back");
     const std::string outLeft = makeDepthDebugPath(leftPath, "left");
@@ -1577,21 +1536,65 @@ int main(int argc, char** argv)
     saveDepthDebug(outLeft.c_str(), depthLeft);
     saveDepthDebug(outRight.c_str(), depthRight);
     saveDepthDebug(outTop.c_str(), depthTop);
-    saveDepthDebug(makeDepthDebugPath(frontPath, "front_denoised").c_str(), depthFrontDen);
-    saveDepthDebug(makeDepthDebugPath(backPath, "back_denoised").c_str(), depthBackDen);
 
-    initVoxel();
+    if (EXPORT_COORD_TXT)
+    {
+        // 五视图：与深度图同 stem/output 目录，文件名 output/{stem}_coords_{view}.txt
+        exportViewPixelWorldCoords(ViewId::Front, makeCoordsDebugPath(frontPath, "front"),
+            depthFront, frontImg, maskFront);
+        exportViewPixelWorldCoords(ViewId::Back, makeCoordsDebugPath(backPath, "back"),
+            depthBack, backImg, maskBack);
+        exportViewPixelWorldCoords(ViewId::Left, makeCoordsDebugPath(leftPath, "left"),
+            depthLeft, leftImg, maskLeft);
+        exportViewPixelWorldCoords(ViewId::Right, makeCoordsDebugPath(rightPath, "right"),
+            depthRight, rightImg, maskRight);
+        exportViewPixelWorldCoords(ViewId::Top, makeCoordsDebugPath(topPath, "top"),
+            depthTop, topImg, maskTop);
+    }
 
-    // Pass3：规范化 depth 精建 → 新模型
-    buildView(ViewId::Front);
-    buildView(ViewId::Back);
-    //buildView(ViewId::Left);
-    //buildView(ViewId::Right);
-    //buildView(ViewId::Top);
+    if (USE_POINT_CLOUD)
+    {
+        clearPointCloud();
+        // 与下方体素分支相同，按需取消注释多视图
+        //buildPointCloudView(ViewId::Front);
+        //buildPointCloudView(ViewId::Back);
+        //buildPointCloudView(ViewId::Left);
+        //buildPointCloudView(ViewId::Right);
+        buildPointCloudView(ViewId::Top);
 
-    denoiseVoxels();
+        cout << "Point cloud points (before density filter): " << pointCloudPos.size() << endl;
+        filterPointCloudByLocalDensity();
+        cout << "Point Cloud Build Done (set USE_POINT_CLOUD=false for voxel)" << endl;
+    }
+    else
+    {
+        initVoxel();
 
-    cout << "Voxel Build Done" << endl;
+        // 一个通用 build 函数，按视角调用
+        //buildView(ViewId::Front);
+        //buildView(ViewId::Back);
+        //buildView(ViewId::Left);
+        //buildView(ViewId::Right);
+        buildView(ViewId::Top);
+
+        // 清理孤立噪声点（值越大去噪越强）
+        removeIsolatedVoxels(4);
+        // 去掉漂浮“成团噪声”：保留足够大的连通块（避免误删手臂等小部件）
+        keepConnectedComponentsBySize(200, 0.03f);
+
+        cout << "Voxel Build Done" << endl;
+    }
+
+    if (EXPORT_COORD_TXT)
+    {
+        cout << "Coords txt (per-view): output/{stem}_coords_{front|back|left|right|top}.txt" << endl;
+        if (!USE_POINT_CLOUD)
+        {
+            const std::string unifiedOut = makeUnifiedVoxelOutPath(frontPath);
+            exportUnifiedOccupiedVoxelsWorld(unifiedOut);
+            cout << "Unified voxels txt: " << unifiedOut << endl;
+        }
+    }
 
     glutInit(&argc, argv);
 
@@ -1603,7 +1606,8 @@ int main(int argc, char** argv)
     glutInitWindowSize(900, 700);
 
     glutCreateWindow(
-        "Multi View Depth Model");
+        USE_POINT_CLOUD ? "Multi View Depth Model (Point Cloud)"
+                        : "Multi View Depth Model (Voxel)");
 
     glEnable(GL_DEPTH_TEST);
 

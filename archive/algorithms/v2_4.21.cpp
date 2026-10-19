@@ -1,11 +1,9 @@
-﻿/*#include <GL/freeglut.h>
+/*#include <GL/freeglut.h>
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <iostream>
 #include <vector>
 #include <cstdint>
-#include <cfloat>
-#include <cmath>
 
 using namespace cv;
 using namespace std;
@@ -18,30 +16,15 @@ Mat frontImg, backImg;
 Mat leftImg, rightImg;
 Mat topImg;
 
-Mat frontImgRaw, backImgRaw;
-Mat leftImgRaw, rightImgRaw;
-Mat topImgRaw;
-
 Mat maskFront, maskBack;
 Mat maskLeft, maskRight;
 Mat maskTop;
-
-Rect boxFront, boxBack;
-Rect boxLeft, boxRight;
-Rect boxTop;
 
 Mat depthFront;
 Mat depthBack;
 Mat depthLeft;
 Mat depthRight;
 Mat depthTop;
-
-// raw float depth (shared scale before normalization)
-Mat depthFrontF;
-Mat depthBackF;
-Mat depthLeftF;
-Mat depthRightF;
-Mat depthTopF;
 
 bool hasRealBack = false;
 bool hasRealRight = false;
@@ -56,16 +39,10 @@ int GRID_X;
 int GRID_Y;
 int GRID_Z;
 
-static vector<uint8_t> voxelOcc;   // 0/1 occupancy (final after carving)
+static vector<uint8_t> voxelOcc;   // 0/1 occupancy
 static vector<Vec3b> voxelCol;     // per-voxel color
 static vector<uint8_t> voxelVote;  // vote count (0..255)
-static vector<uint8_t> voxelSrc;   // bitmask: which view(s) support this voxel
-
-// per-view scratch: "possibly occupied" volume before intersection
-static vector<uint8_t> voxelPossible;
-static vector<Vec3b> voxelPossibleCol;
-static bool carveFirstView = true;
-static int carvedViewCount = 0;
+static vector<uint8_t> voxelSrc;   // bitmask: which view(s) wrote this voxel
 
 float cubeSize = 2.0f;
 
@@ -79,10 +56,10 @@ enum class ViewId
 };
 
 static const uint8_t SRC_FRONT = 1 << 0;
-static const uint8_t SRC_BACK = 1 << 1;
-static const uint8_t SRC_LEFT = 1 << 2;
+static const uint8_t SRC_BACK  = 1 << 1;
+static const uint8_t SRC_LEFT  = 1 << 2;
 static const uint8_t SRC_RIGHT = 1 << 3;
-static const uint8_t SRC_TOP = 1 << 4;
+static const uint8_t SRC_TOP   = 1 << 4;
 
 static inline int voxelIndex(int x, int y, int z)
 {
@@ -94,22 +71,6 @@ static inline bool inBounds(int x, int y, int z)
     return (x >= 0 && y >= 0 && z >= 0 &&
         x < GRID_X && y < GRID_Y && z < GRID_Z);
 }
-
-static void buildView(ViewId id);
-static void safeSetColor(int x, int y, int z, Vec3b c, uint8_t srcBit);
-static void removeIsolatedVoxels(int minNeighborCount);
-static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLargest);
-
-// volume carving helpers
-static void resetPossibleVolume();
-static void markPossibleVoxel(int x, int y, int z, const Vec3b& c);
-static void applyVoxelIntersection(uint8_t srcBit);
-static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, const Vec3b& c);
-static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, const Vec3b& c);
-static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, const Vec3b& c);
-static int mapLeftDepthToX(uchar u);
-static int mapRightDepthToX(uchar u);
-static int mapTopDepthToY(uchar u);
 
 ////////////////////////////////////////////////////////
 // Camera（完全保留）
@@ -126,7 +87,7 @@ bool isDragging = false;
 // removeWhite（完全保留）
 ////////////////////////////////////////////////////////
 
-Mat extractForegroundCrop(const Mat& src, Mat& outMask, Rect& outBox)
+Mat removeWhite(Mat src, Mat& outMask)
 {
     if (src.empty()) return src;
 
@@ -170,8 +131,9 @@ Mat extractForegroundCrop(const Mat& src, Mat& outMask, Rect& outBox)
 
     if (contours.empty())
     {
-        outMask = Mat::ones(src.size(), CV_8U) * 255;
-        outBox = Rect(0, 0, src.cols, src.rows);
+        outMask =
+            Mat::ones(src.size(), CV_8U) * 255;
+
         return src;
     }
 
@@ -190,26 +152,13 @@ Mat extractForegroundCrop(const Mat& src, Mat& outMask, Rect& outBox)
         }
     }
 
-    Mat fullMask = Mat::zeros(src.size(), CV_8U);
-    drawContours(
-        fullMask,
-        contours,
-        maxIndex,
-        Scalar(255),
-        FILLED);
+    Rect box =
+        boundingRect(contours[maxIndex]);
 
-    outBox = boundingRect(contours[maxIndex]);
-    outMask = fullMask(outBox).clone();
-    return src(outBox).clone();
-}
+    outMask =
+        mask(box);
 
-static Mat cropDepthByBox(const Mat& depth, const Rect& box)
-{
-    if (depth.empty()) return Mat();
-    Rect valid = box & Rect(0, 0, depth.cols, depth.rows);
-    if (valid.width <= 0 || valid.height <= 0)
-        return depth.clone();
-    return depth(valid).clone();
+    return src(box);
 }
 
 ////////////////////////////////////////////////////////
@@ -219,21 +168,21 @@ static Mat cropDepthByBox(const Mat& depth, const Rect& box)
 void alignImages()
 {
     frontImg =
-        extractForegroundCrop(frontImgRaw, maskFront, boxFront);
+        removeWhite(frontImg, maskFront);
 
     leftImg =
-        extractForegroundCrop(leftImgRaw, maskLeft, boxLeft);
+        removeWhite(leftImg, maskLeft);
 
     topImg =
-        extractForegroundCrop(topImgRaw, maskTop, boxTop);
+        removeWhite(topImg, maskTop);
 
-    if (!backImgRaw.empty())
+    if (!backImg.empty())
         backImg =
-        extractForegroundCrop(backImgRaw, maskBack, boxBack);
+        removeWhite(backImg, maskBack);
 
-    if (!rightImgRaw.empty())
+    if (!rightImg.empty())
         rightImg =
-        extractForegroundCrop(rightImgRaw, maskRight, boxRight);
+        removeWhite(rightImg, maskRight);
 
     int W = frontImg.cols;
     int H = frontImg.rows;
@@ -274,7 +223,6 @@ void alignImages()
     {
         flip(frontImg, backImg, 1);
         flip(maskFront, maskBack, 1);
-        boxBack = boxFront;
     }
 
     if (rightImg.empty())
@@ -282,7 +230,6 @@ void alignImages()
         // 左视图已做过一次左右翻转，这里直接拷贝给右视图，避免再次反向
         rightImg = leftImg.clone();
         maskRight = maskLeft.clone();
-        boxRight = boxLeft;
     }
 
     resize(backImg, backImg, Size(W, H));
@@ -299,7 +246,7 @@ void alignImages()
 // ⭐真正按图分辨率 + 自动缩放（最终推荐）
 //////////////////////////////////////////////////////
 
-    const int MAX_GRID = 256;
+    const int MAX_GRID = 1024;
     // 体素数据结构已改为动态分配，可直接调大 MAX_GRID 提升精度
 
     int maxDim =
@@ -330,6 +277,7 @@ void alignImages()
     cout << "GX = " << GRID_X << endl;
     cout << "GY = " << GRID_Y << endl;
     cout << "GZ = " << GRID_Z << endl;
+    imwrite("outputs/legacy/debug_left_aligned.png", leftImg);
 }
 
 ////////////////////////////////////////////////////////
@@ -355,7 +303,7 @@ Mat runDepthAnything(Mat& inputImg)
 
     static Ort::Session session(
         env,
-        L"model/depth_anything_v2_large.onnx",
+        L"models/depth_anything_v2_large.onnx",
         opts);
 
     Mat img;
@@ -420,96 +368,28 @@ Mat runDepthAnything(Mat& inputImg)
         CV_32F,
         data);
 
-    Mat safeDepth = depth.clone(); // detach from ORT buffer
+    Mat safeDepth =
+        depth.clone();
 
-    // return raw float depth resized to original image size (global normalization happens later)
+    Mat depth8U;
+
+    normalize(
+        safeDepth,
+        depth8U,
+        0,
+        255,
+        NORM_MINMAX);
+
+    depth8U.convertTo(
+        depth8U,
+        CV_8U);
+
     resize(
-        safeDepth,
-        safeDepth,
+        depth8U,
+        depth8U,
         inputImg.size());
 
-    return safeDepth;
-}
-
-static void normalizeDepthsByAxis(
-    const Mat& dFrontF, const Mat& mFront,
-    const Mat& dBackF, const Mat& mBack,
-    const Mat& dLeftF, const Mat& mLeft,
-    const Mat& dRightF, const Mat& mRight,
-    const Mat& dTopF, const Mat& mTop,
-    Mat& outFront8U, Mat& outBack8U, Mat& outLeft8U, Mat& outRight8U, Mat& outTop8U)
-{
-    // 不同视角的 depth 表示的是不同轴（Z/X/Y），不能混在一个 gmin/gmax 里统一归一化
-    // - front/back: Z 轴
-    // - left/right: X 轴
-    // - top: Y 轴
-
-    auto computeMinMax = [&](const Mat& dA, const Mat& mA, const Mat& dB, const Mat& mB, float& mn, float& mx)
-        {
-            mn = FLT_MAX;
-            mx = -FLT_MAX;
-            auto scan = [&](const Mat& d, const Mat& m)
-                {
-                    if (d.empty() || m.empty()) return;
-                    for (int y = 0; y < d.rows; y++)
-                        for (int x = 0; x < d.cols; x++)
-                        {
-                            if (m.at<uchar>(y, x) == 0) continue;
-                            float v = d.at<float>(y, x);
-                            if (!std::isfinite(v)) continue;
-                            mn = min(mn, v);
-                            mx = max(mx, v);
-                        }
-                };
-            scan(dA, mA);
-            scan(dB, mB);
-        };
-
-    auto toU8Range = [&](const Mat& d, float mn, float mx, Mat& out)
-        {
-            if (d.empty()) { out = Mat(); return; }
-            if (!(mx > mn))
-            {
-                Mat tmp8;
-                normalize(d, tmp8, 0, 255, NORM_MINMAX);
-                tmp8.convertTo(out, CV_8U);
-                return;
-            }
-
-            Mat tmp(d.size(), CV_8U);
-            const float scale = 255.0f / (mx - mn);
-            for (int y = 0; y < d.rows; y++)
-                for (int x = 0; x < d.cols; x++)
-                {
-                    float v = d.at<float>(y, x);
-                    if (!std::isfinite(v))
-                        tmp.at<uchar>(y, x) = 0;
-                    else
-                    {
-                        float n = (v - mn) * scale;
-                        n = max(0.0f, min(255.0f, n));
-                        tmp.at<uchar>(y, x) = (uchar)(n);
-                    }
-                }
-            out = tmp;
-        };
-
-    // Z group
-    float zMin, zMax;
-    computeMinMax(dFrontF, mFront, dBackF, mBack, zMin, zMax);
-    toU8Range(dFrontF, zMin, zMax, outFront8U);
-    toU8Range(dBackF, zMin, zMax, outBack8U);
-
-    // X group
-    float xMin, xMax;
-    computeMinMax(dLeftF, mLeft, dRightF, mRight, xMin, xMax);
-    toU8Range(dLeftF, xMin, xMax, outLeft8U);
-    toU8Range(dRightF, xMin, xMax, outRight8U);
-
-    // Y group (top only)
-    float yMin = FLT_MAX, yMax = -FLT_MAX;
-    computeMinMax(dTopF, mTop, Mat(), Mat(), yMin, yMax);
-    toU8Range(dTopF, yMin, yMax, outTop8U);
+    return depth8U.clone();
 }
 
 static void saveDepthDebug(const char* filename, const Mat& depth8U)
@@ -518,281 +398,23 @@ static void saveDepthDebug(const char* filename, const Mat& depth8U)
     imwrite(filename, depth8U);
 }
 
-static std::string makeDepthDebugPath(const std::string& inputImagePath, const char* dirName)
+static Mat applyMaskBackground(const Mat& bgr, const Mat& mask, const Scalar& bgBgr)
 {
-    // Avoid std::filesystem (requires C++17); do simple path/stem parse.
-    std::string name = inputImagePath;
-    const size_t slash = name.find_last_of("/\\");
-    if (slash != std::string::npos)
-        name = name.substr(slash + 1);
+    if (bgr.empty()) return Mat();
+    if (mask.empty()) return bgr.clone();
 
-    std::string stem = name;
-    const size_t dot = stem.find_last_of('.');
-    if (dot != std::string::npos)
-        stem = stem.substr(0, dot);
-
-    return std::string("output/") + stem + "_depth_" + std::string(dirName) + ".png";
+    Mat out = Mat(bgr.size(), bgr.type(), bgBgr);
+    bgr.copyTo(out, mask);
+    return out;
 }
 
-struct MaskedDepthRange
+static Mat maskDepthForDebug(const Mat& depth8U, const Mat& mask)
 {
-    float mn = FLT_MAX;
-    float mx = -FLT_MAX;
-    bool valid = false;
-};
-
-static MaskedDepthRange computeMaskedDepthRange(const Mat& d, const Mat& m)
-{
-    MaskedDepthRange r;
-    if (d.empty() || m.empty() || d.size() != m.size())
-        return r;
-
-    for (int y = 0; y < d.rows; y++)
-        for (int x = 0; x < d.cols; x++)
-        {
-            if (m.at<uchar>(y, x) == 0) continue;
-            float v = d.at<float>(y, x);
-            if (!std::isfinite(v)) continue;
-            r.mn = min(r.mn, v);
-            r.mx = max(r.mx, v);
-            r.valid = true;
-        }
-    return r;
-}
-
-static void normalizeDepthPerView(const Mat& dF, const Mat& m, Mat& out8U)
-{
-    out8U = Mat();
-    if (dF.empty()) return;
-
-    const MaskedDepthRange r = computeMaskedDepthRange(dF, m);
-    if (!r.valid)
-    {
-        Mat tmp8;
-        normalize(dF, tmp8, 0, 255, NORM_MINMAX);
-        tmp8.convertTo(out8U, CV_8U);
-        return;
-    }
-
-    const float span = max(r.mx - r.mn, 1e-6f);
-    out8U = Mat::zeros(dF.size(), CV_8U);
-    for (int y = 0; y < dF.rows; y++)
-        for (int x = 0; x < dF.cols; x++)
-        {
-            if (!m.empty() && m.at<uchar>(y, x) == 0) continue;
-            float v = dF.at<float>(y, x);
-            if (!std::isfinite(v)) continue;
-            const float n = (v - r.mn) / span;
-            const int u = (int)(n * 254.0f + 1.5f);
-            out8U.at<uchar>(y, x) = (uchar)max(1, min(255, u));
-        }
-}
-
-static void normalizeDepthsIndependent(
-    const Mat& dFrontF, const Mat& mFront,
-    const Mat& dBackF, const Mat& mBack,
-    const Mat& dLeftF, const Mat& mLeft,
-    const Mat& dRightF, const Mat& mRight,
-    const Mat& dTopF, const Mat& mTop,
-    Mat& outFront8U, Mat& outBack8U, Mat& outLeft8U, Mat& outRight8U, Mat& outTop8U)
-{
-    normalizeDepthPerView(dFrontF, mFront, outFront8U);
-    normalizeDepthPerView(dBackF, mBack, outBack8U);
-    normalizeDepthPerView(dLeftF, mLeft, outLeft8U);
-    normalizeDepthPerView(dRightF, mRight, outRight8U);
-    normalizeDepthPerView(dTopF, mTop, outTop8U);
-}
-
-// 同一条 (x,y) 射线上 front+back depth 等比放大，使管壁在 Z 方向尽量铺满
-static void scaleFrontBackDepthPair(Mat& front8U, Mat& back8U, const Mat& mFront, const Mat& mBack)
-{
-    if (front8U.empty() || back8U.empty()) return;
-
-    vector<int> pairSums;
-    pairSums.reserve(4096);
-    for (int y = 0; y < front8U.rows; y++)
-        for (int x = 0; x < front8U.cols; x++)
-        {
-            if (!mFront.empty() && mFront.at<uchar>(y, x) == 0) continue;
-            if (!mBack.empty() && mBack.at<uchar>(y, x) == 0) continue;
-            const uchar uf = front8U.at<uchar>(y, x);
-            const uchar ub = back8U.at<uchar>(y, x);
-            if (uf == 0 || ub == 0) continue;
-            pairSums.push_back((int)uf + (int)ub);
-        }
-
-    if (pairSums.empty()) return;
-
-    sort(pairSums.begin(), pairSums.end());
-    const size_t iP95 = min(pairSums.size() - 1, (size_t)(pairSums.size() * 0.95f));
-    const int p95Sum = pairSums[iP95];
-    const float targetSum = 510.0f;
-    if (p95Sum <= 0 || p95Sum >= (int)targetSum) return;
-
-    const float k = min(2.0f, targetSum / (float)p95Sum);
-    cout << "  front/back pair scale: P95(uF+uB)=" << p95Sum << " k=" << k << endl;
-
-    for (int y = 0; y < front8U.rows; y++)
-        for (int x = 0; x < front8U.cols; x++)
-        {
-            if (!mFront.empty() && mFront.at<uchar>(y, x) == 0) continue;
-            if (!mBack.empty() && mBack.at<uchar>(y, x) == 0) continue;
-            uchar& uf = front8U.at<uchar>(y, x);
-            uchar& ub = back8U.at<uchar>(y, x);
-            if (uf == 0 || ub == 0) continue;
-            uf = (uchar)max(1, min(255, (int)(uf * k + 0.5f)));
-            ub = (uchar)max(1, min(255, (int)(ub * k + 0.5f)));
-        }
-}
-
-static int mapFrontDepthToZ(uchar u)
-{
-    if (u == 0) return -1;
-    return (int)(((float)u - 1.0f) * (GRID_Z - 1) / 254.0f + 0.5f);
-}
-
-static int mapBackDepthToZ(uchar u)
-{
-    if (u == 0) return -1;
-    return (int)((GRID_Z - 1) - ((float)u - 1.0f) * (GRID_Z - 1) / 254.0f + 0.5f);
-}
-
-static int mapLeftDepthToX(uchar u)
-{
-    if (u == 0) return -1;
-    return (int)(((float)u - 1.0f) * (GRID_X - 1) / 254.0f + 0.5f);
-}
-
-static int mapRightDepthToX(uchar u)
-{
-    if (u == 0) return -1;
-    return (int)((GRID_X - 1) - ((float)u - 1.0f) * (GRID_X - 1) / 254.0f + 0.5f);
-}
-
-static int mapTopDepthToY(uchar u)
-{
-    if (u == 0) return -1;
-    return (int)(((float)u - 1.0f) * (GRID_Y - 1) / 254.0f + 0.5f);
-}
-
-////////////////////////////////////////////////////////
-// volume carving: per-view possible volume + intersection
-////////////////////////////////////////////////////////
-
-static void resetPossibleVolume()
-{
-    fill(voxelPossible.begin(), voxelPossible.end(), 0);
-}
-
-static void markPossibleVoxel(int x, int y, int z, const Vec3b& c)
-{
-    if (!inBounds(x, y, z)) return;
-    const int idx = voxelIndex(x, y, z);
-    if (!voxelPossible[idx])
-    {
-        voxelPossible[idx] = 1;
-        voxelPossibleCol[idx] = c;
-    }
-    else
-    {
-        const Vec3b old = voxelPossibleCol[idx];
-        voxelPossibleCol[idx] = Vec3b(
-            (uchar)(((int)old[0] + (int)c[0]) / 2),
-            (uchar)(((int)old[1] + (int)c[1]) / 2),
-            (uchar)(((int)old[2] + (int)c[2]) / 2)
-        );
-    }
-}
-
-// Front: z=0..bound ; Back: z=bound..GRID_Z-1
-static void fillVolumeZ(int vx, int vy, int zBound, bool fromMinZ, const Vec3b& c)
-{
-    zBound = min(GRID_Z - 1, max(0, zBound));
-    if (fromMinZ)
-    {
-        for (int z = 0; z <= zBound; z++)
-            markPossibleVoxel(vx, vy, z, c);
-    }
-    else
-    {
-        for (int z = zBound; z < GRID_Z; z++)
-            markPossibleVoxel(vx, vy, z, c);
-    }
-}
-
-// Left: x=0..bound ; Right: x=bound..GRID_X-1
-static void fillVolumeX(int vy, int vz, int xBound, bool fromMinX, const Vec3b& c)
-{
-    xBound = min(GRID_X - 1, max(0, xBound));
-    if (fromMinX)
-    {
-        for (int x = 0; x <= xBound; x++)
-            markPossibleVoxel(x, vy, vz, c);
-    }
-    else
-    {
-        for (int x = xBound; x < GRID_X; x++)
-            markPossibleVoxel(x, vy, vz, c);
-    }
-}
-
-// Top: y=0..bound (camera from +Y looking toward origin)
-static void fillVolumeY(int vx, int vz, int yBound, bool fromMinY, const Vec3b& c)
-{
-    yBound = min(GRID_Y - 1, max(0, yBound));
-    if (fromMinY)
-    {
-        for (int y = 0; y <= yBound; y++)
-            markPossibleVoxel(vx, y, vz, c);
-    }
-    else
-    {
-        for (int y = yBound; y < GRID_Y; y++)
-            markPossibleVoxel(vx, y, vz, c);
-    }
-}
-
-// Step 2: AND current view's possible volume into shared voxelOcc
-static void applyVoxelIntersection(uint8_t srcBit)
-{
-    const size_t n = voxelOcc.size();
-    if (carveFirstView)
-    {
-        for (size_t i = 0; i < n; i++)
-        {
-            voxelOcc[i] = voxelPossible[i];
-            if (voxelOcc[i])
-            {
-                voxelCol[i] = voxelPossibleCol[i];
-                voxelSrc[i] = srcBit;
-                voxelVote[i] = 1;
-            }
-        }
-        carveFirstView = false;
-        return;
-    }
-
-    for (size_t i = 0; i < n; i++)
-    {
-        if (!voxelPossible[i])
-        {
-            voxelOcc[i] = 0;
-            continue;
-        }
-        if (!voxelOcc[i])
-            continue;
-
-        const Vec3b old = voxelCol[i];
-        const Vec3b neu = voxelPossibleCol[i];
-        voxelCol[i] = Vec3b(
-            (uchar)(((int)old[0] + (int)neu[0]) / 2),
-            (uchar)(((int)old[1] + (int)neu[1]) / 2),
-            (uchar)(((int)old[2] + (int)neu[2]) / 2)
-        );
-        voxelSrc[i] |= srcBit;
-        if (voxelVote[i] < 255)
-            voxelVote[i]++;
-    }
+    if (depth8U.empty()) return Mat();
+    if (mask.empty()) return depth8U.clone();
+    Mat out = depth8U.clone();
+    out.setTo(0, mask == 0);
+    return out;
 }
 
 ////////////////////////////////////////////////////////
@@ -806,10 +428,6 @@ void initVoxel()
     voxelCol.assign(n, Vec3b(0, 0, 0));
     voxelVote.assign(n, 0);
     voxelSrc.assign(n, 0);
-    voxelPossible.assign(n, 0);
-    voxelPossibleCol.assign(n, Vec3b(0, 0, 0));
-    carveFirstView = true;
-    carvedViewCount = 0;
 }
 
 void safeSetColor(int x, int y, int z, Vec3b c, uint8_t srcBit)
@@ -877,6 +495,85 @@ void removeIsolatedVoxels(int minNeighborCount)
             }
 
     voxelOcc.swap(keep);
+}
+
+static void applySideBoundsFromLeftRight(int toleranceVoxel)
+{
+    // 从“已经建出来的 left/right 体素”统计 (y,z) 的边界，仅裁剪 TOP 贡献的越界体素
+    // 重要：left/right 都存在时才做双边夹；只存在单边时只做单边约束，避免把 top 全裁掉
+    // left 给出的是左表面（应取最小 x），right 给出右表面（应取最大 x）
+    vector<int> xLeft((size_t)GRID_Y * (size_t)GRID_Z, GRID_X);      // left: min x
+    vector<int> xRight((size_t)GRID_Y * (size_t)GRID_Z, -1);         // right: max x
+    vector<uint8_t> hasLeft((size_t)GRID_Y * (size_t)GRID_Z, 0);
+    vector<uint8_t> hasRight((size_t)GRID_Y * (size_t)GRID_Z, 0);
+
+    auto yzIndex = [&](int y, int z) -> int { return y * GRID_Z + z; };
+
+    for (int x = 0; x < GRID_X; x++)
+        for (int y = 0; y < GRID_Y; y++)
+            for (int z = 0; z < GRID_Z; z++)
+            {
+                const int idx = voxelIndex(x, y, z);
+                if (!voxelOcc[idx]) continue;
+                const uint8_t src = voxelSrc[idx];
+
+                const int id = yzIndex(y, z);
+                if (src & SRC_LEFT)
+                {
+                    if (!hasLeft[id])
+                    {
+                        xLeft[id] = x;
+                        hasLeft[id] = 1;
+                    }
+                    else
+                    {
+                        xLeft[id] = min(xLeft[id], x);
+                    }
+                }
+                if (src & SRC_RIGHT)
+                {
+                    if (!hasRight[id])
+                    {
+                        xRight[id] = x;
+                        hasRight[id] = 1;
+                    }
+                    else
+                    {
+                        xRight[id] = max(xRight[id], x);
+                    }
+                }
+            }
+
+    for (int y = 0; y < GRID_Y; y++)
+        for (int z = 0; z < GRID_Z; z++)
+        {
+            const int id = yzIndex(y, z);
+            if (!hasLeft[id] && !hasRight[id]) continue;
+
+            int lo = 0;
+            int hi = GRID_X - 1;
+            if (hasLeft[id])
+                lo = max(lo, xLeft[id] - toleranceVoxel);
+            if (hasRight[id])
+                hi = min(hi, xRight[id] + toleranceVoxel);
+            lo = max(0, lo);
+            hi = min(GRID_X - 1, hi);
+            if (lo > hi) continue;
+
+            for (int x = 0; x < GRID_X; x++)
+            {
+                const int idx = voxelIndex(x, y, z);
+                if (!voxelOcc[idx]) continue;
+
+                // 只裁剪 top 造成的 overhang，不动 left/right 自己
+                if ((voxelSrc[idx] & SRC_TOP) == 0) continue;
+                if (x < lo || x > hi)
+                {
+                    voxelOcc[idx] = 0;
+                    voxelSrc[idx] &= (uint8_t)~SRC_TOP;
+                }
+            }
+        }
 }
 
 static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLargest)
@@ -1001,7 +698,6 @@ static void keepConnectedComponentsBySize(int minKeepSize, float keepRatioOfLarg
 ////////////////////////////////////////////////////////
 
 // buildFront/buildBack/buildLeft/buildRight/buildTop 已合并为 buildView(ViewId)
-// 每个视角：深度方向填满“可能占用”体积 → 多视角体素交集雕刻
 
 static void buildView(ViewId id)
 {
@@ -1011,28 +707,30 @@ static void buildView(ViewId id)
 
     int aSize = 0;
     int bSize = 0;
+    int thicknessAxis = 2; // 0->x,1->y,2->z
+    const int thickness = 2;
 
     switch (id)
     {
     case ViewId::Front:
         depth = &depthFront; img = &frontImg; mask = &maskFront;
-        aSize = GRID_X; bSize = GRID_Y;
+        aSize = GRID_X; bSize = GRID_Y; thicknessAxis = 2;
         break;
     case ViewId::Back:
         depth = &depthBack; img = &backImg; mask = &maskBack;
-        aSize = GRID_X; bSize = GRID_Y;
+        aSize = GRID_X; bSize = GRID_Y; thicknessAxis = 2;
         break;
     case ViewId::Left:
         depth = &depthLeft; img = &leftImg; mask = &maskLeft;
-        aSize = GRID_Z; bSize = GRID_Y;
+        aSize = GRID_Z; bSize = GRID_Y; thicknessAxis = 0;
         break;
     case ViewId::Right:
         depth = &depthRight; img = &rightImg; mask = &maskRight;
-        aSize = GRID_Z; bSize = GRID_Y;
+        aSize = GRID_Z; bSize = GRID_Y; thicknessAxis = 0;
         break;
     case ViewId::Top:
         depth = &depthTop; img = &topImg; mask = &maskTop;
-        aSize = GRID_X; bSize = GRID_Z;
+        aSize = GRID_X; bSize = GRID_Z; thicknessAxis = 1;
         break;
     }
 
@@ -1049,7 +747,7 @@ static void buildView(ViewId id)
     vector<int> colorRSum(projN, 0);
     vector<int> hitCount(projN, 0);
 
-    // Step 1a: 聚合到投影网格 (a,b)
+    // 1) 聚合到投影网格 (a,b)
     for (int py = 0; py < h; py++)
         for (int px = 0; px < w; px++)
         {
@@ -1057,9 +755,6 @@ static void buildView(ViewId id)
                 continue;
 
             const uchar d = depth->at<uchar>(py, px);
-            if (d == 0)
-                continue;
-
             const Vec3b c = img->at<Vec3b>(py, px);
 
             int a = 0;
@@ -1073,12 +768,12 @@ static void buildView(ViewId id)
                 break;
             case ViewId::Left:
             case ViewId::Right:
-                a = px * GRID_Z / w;
-                b = (h - py - 1) * GRID_Y / h;
+                a = px * GRID_Z / w;            // z
+                b = (h - py - 1) * GRID_Y / h;  // y
                 break;
             case ViewId::Top:
-                a = px * GRID_X / w;
-                b = py * GRID_Z / h;
+                a = px * GRID_X / w;            // x
+                b = py * GRID_Z / h;            // z
                 break;
             }
 
@@ -1093,6 +788,7 @@ static void buildView(ViewId id)
             hitCount[pidx]++;
         }
 
+    // 2) 生成中心体素并沿厚度轴连续化
     uint8_t srcBit = 0;
     switch (id)
     {
@@ -1103,11 +799,6 @@ static void buildView(ViewId id)
     case ViewId::Top:   srcBit = SRC_TOP; break;
     }
 
-    resetPossibleVolume();
-
-    int filledCells = 0;
-
-    // Step 1b: 沿深度轴填满“可能物体”体积（非薄壳）
     for (int a = 0; a < aSize; a++)
         for (int b = 0; b < bSize; b++)
         {
@@ -1115,78 +806,70 @@ static void buildView(ViewId id)
             const int cnt = hitCount[pidx];
             if (cnt <= 0) continue;
 
-            const uchar avgDepth = (uchar)(depthSum[pidx] / cnt);
+            const int avgDepth = depthSum[pidx] / cnt;
 
-            const Vec3b avgColor(
+            Vec3b avgColor(
                 (uchar)(colorBSum[pidx] / cnt),
                 (uchar)(colorGSum[pidx] / cnt),
                 (uchar)(colorRSum[pidx] / cnt)
             );
 
+            int vx = 0, vy = 0, vz = 0;
+
             switch (id)
             {
             case ViewId::Front:
-            {
-                const int z = mapFrontDepthToZ(avgDepth);
-                if (z < 0) continue;
-                fillVolumeZ(a, b, z, true, avgColor);
-                filledCells++;
+                vx = a; vy = b;
+                vz = avgDepth * GRID_Z / 255;
                 break;
-            }
             case ViewId::Back:
-            {
-                const int z = mapBackDepthToZ(avgDepth);
-                if (z < 0) continue;
-                fillVolumeZ(a, b, z, false, avgColor);
-                filledCells++;
+                vx = a; vy = b;
+                vz = GRID_Z - avgDepth * GRID_Z / 255 - 1;
                 break;
-            }
             case ViewId::Left:
-            {
-                const int x = mapLeftDepthToX(avgDepth);
-                if (x < 0) continue;
-                fillVolumeX(b, a, x, true, avgColor);
-                filledCells++;
+                vz = a; vy = b;
+                vx = avgDepth * GRID_X / 255;
                 break;
-            }
             case ViewId::Right:
-            {
-                const int x = mapRightDepthToX(avgDepth);
-                if (x < 0) continue;
-                fillVolumeX(b, a, x, false, avgColor);
-                filledCells++;
+                vz = a; vy = b;
+                vx = GRID_X - avgDepth * GRID_X / 255 - 1;
                 break;
-            }
             case ViewId::Top:
-            {
-                const int y = mapTopDepthToY(avgDepth);
-                if (y < 0) continue;
-                fillVolumeY(a, b, y, true, avgColor);
-                filledCells++;
+                vx = a; vz = b;
+                {
+                    int vy0 = avgDepth * GRID_Y / 255;
+                    int yTop = GRID_Y - 1;
+                    vy = yTop - (int)((yTop - vy0) * 1.5f);
+                }
                 break;
             }
-            default:
-                break;
+
+            vx = min(GRID_X - 1, max(0, vx));
+            vy = min(GRID_Y - 1, max(0, vy));
+            vz = min(GRID_Z - 1, max(0, vz));
+
+            if (thicknessAxis == 0)
+            {
+                int x0 = max(0, vx - thickness);
+                int x1 = min(GRID_X - 1, vx + thickness);
+                for (int xx = x0; xx <= x1; xx++)
+                    safeSetColor(xx, vy, vz, avgColor, srcBit);
+            }
+            else if (thicknessAxis == 1)
+            {
+                int y0 = max(0, vy - thickness);
+                int y1 = min(GRID_Y - 1, vy + thickness);
+                for (int yy = y0; yy <= y1; yy++)
+                    safeSetColor(vx, yy, vz, avgColor, srcBit);
+            }
+            else
+            {
+                int z0 = max(0, vz - thickness);
+                int z1 = min(GRID_Z - 1, vz + thickness);
+                for (int zz = z0; zz <= z1; zz++)
+                    safeSetColor(vx, vy, zz, avgColor, srcBit);
             }
         }
-
-    if (filledCells <= 0)
-        return;
-
-    // Step 2: 与已有体素空间求交
-    applyVoxelIntersection(srcBit);
-    carvedViewCount++;
-
-    const char* viewName = "?";
-    switch (id)
-    {
-    case ViewId::Front: viewName = "Front"; break;
-    case ViewId::Back:  viewName = "Back"; break;
-    case ViewId::Left:  viewName = "Left"; break;
-    case ViewId::Right: viewName = "Right"; break;
-    case ViewId::Top:   viewName = "Top"; break;
-    }
-    cout << "  carve " << viewName << ": filled " << filledCells << " cells" << endl;
 }
 
 ////////////////////////////////////////////////////////
@@ -1346,126 +1029,72 @@ void motion(int x, int y)
 
 int main(int argc, char** argv)
 {
-    const std::string frontPath = "input/front.png";
-    const std::string backPath = "input/back.png";
-    const std::string leftPath = "input/left.png";
-    const std::string rightPath = "input/right.png";
-    const std::string topPath = "input/top.png";
+    frontImg = imread("data/samples/multiview/f01.png");
+    backImg = imread("data/samples/multiview/b01.png");
+    hasRealBack = !backImg.empty();
 
-    frontImgRaw = imread(frontPath);
-    backImgRaw = imread(backPath);
-    hasRealBack = !backImgRaw.empty();
+    leftImg = imread("data/samples/multiview/l01.png");
+    rightImg = imread("data/samples/multiview/r01.png");
+    hasRealRight = !rightImg.empty();
 
-    leftImgRaw = imread(leftPath);
-    rightImgRaw = imread(rightPath);
-    hasRealRight = !rightImgRaw.empty();
+    topImg = imread("data/samples/multiview/t01.png");
 
-    topImgRaw = imread(topPath);
-
-    if (frontImgRaw.empty() ||
-        leftImgRaw.empty() ||
-        topImgRaw.empty())
+    if (frontImg.empty() ||
+        leftImg.empty() ||
+        topImg.empty())
     {
         cout << "Need front left top" << endl;
         return -1;
     }
 
-    if (!hasRealBack)
-        flip(frontImgRaw, backImgRaw, 1);
-
-    if (!hasRealRight)
-        flip(leftImgRaw, rightImgRaw, 1);
-
     alignImages();
 
-    depthFrontF = cropDepthByBox(runDepthAnything(frontImgRaw), boxFront);
-    depthBackF = cropDepthByBox(runDepthAnything(backImgRaw), boxBack);
-    depthLeftF = cropDepthByBox(runDepthAnything(leftImgRaw), boxLeft);
-    depthRightF = cropDepthByBox(runDepthAnything(rightImgRaw), boxRight);
-    depthTopF = cropDepthByBox(runDepthAnything(topImgRaw), boxTop);
+    // 用 mask 把背景替换为中性灰，避免侧视图大面积白背景导致 depth 退化成“灰条”
+    const Scalar bg(127, 127, 127);
+    Mat frontIn = applyMaskBackground(frontImg, maskFront, bg);
+    Mat backIn = applyMaskBackground(backImg, maskBack, bg);
+    Mat leftIn = applyMaskBackground(leftImg, maskLeft, bg);
+    Mat rightIn = applyMaskBackground(rightImg, maskRight, bg);
+    Mat topIn = applyMaskBackground(topImg, maskTop, bg);
 
-    if (!depthFrontF.empty() && depthFrontF.size() != frontImg.size())
-        resize(depthFrontF, depthFrontF, frontImg.size());
+    depthFront = runDepthAnything(frontIn);
+    depthBack = runDepthAnything(backIn);
+    depthLeft = runDepthAnything(leftIn);
+    depthRight = runDepthAnything(rightIn);
+    depthTop = runDepthAnything(topIn);
 
-    if (!depthLeftF.empty())
-    {
-        float scale = (float)frontImg.rows / depthLeftF.rows;
-        resize(depthLeftF, depthLeftF, Size(), scale, scale);
-        flip(depthLeftF, depthLeftF, 1);
-        if (depthLeftF.size() != leftImg.size())
-            resize(depthLeftF, depthLeftF, leftImg.size());
-    }
+    // 保存5张深度图到当前目录（便于观察）
+    // 保存 depth（背景置 0，便于观察真实前景）
+    saveDepthDebug("outputs/depth_front.png", maskDepthForDebug(depthFront, maskFront));
+    saveDepthDebug("outputs/depth_back.png", maskDepthForDebug(depthBack, maskBack));
+    saveDepthDebug("outputs/depth_left.png", maskDepthForDebug(depthLeft, maskLeft));
+    saveDepthDebug("outputs/depth_right.png", maskDepthForDebug(depthRight, maskRight));
+    saveDepthDebug("outputs/depth_top.png", maskDepthForDebug(depthTop, maskTop));
 
-    if (!depthTopF.empty())
-    {
-        rotate(depthTopF, depthTopF, ROTATE_90_COUNTERCLOCKWISE);
-        if (depthTopF.size() != topImg.size())
-            resize(depthTopF, depthTopF, topImg.size());
-    }
-
-    if (!depthBackF.empty() && depthBackF.size() != backImg.size())
-        resize(depthBackF, depthBackF, backImg.size());
-
-    if (!hasRealBack)
-        flip(depthFrontF, depthBackF, 1);
-    else if (!depthBackF.empty())
-        flip(depthBackF, depthBackF, 1);
-
-    if (!depthRightF.empty())
-    {
-        if (!hasRealRight)
-        {
-            depthRightF = depthLeftF.clone();
-        }
-        else if (depthRightF.size() != rightImg.size())
-        {
-            resize(depthRightF, depthRightF, rightImg.size());
-        }
-    }
-
-    // 各视图独立 depth 归一化 → 配对缩放 → 体素雕刻
-    cout << "=== Depth: per-view normalize + pair scale ===" << endl;
-    normalizeDepthsIndependent(
-        depthFrontF, maskFront,
-        depthBackF, maskBack,
-        depthLeftF, maskLeft,
-        depthRightF, maskRight,
-        depthTopF, maskTop,
-        depthFront, depthBack, depthLeft, depthRight, depthTop);
-
-    scaleFrontBackDepthPair(depthFront, depthBack, maskFront, maskBack);
-
-    // 保存深度图到 output/（便于观察）
-    const std::string outFront = makeDepthDebugPath(frontPath, "front");
-    const std::string outBack = makeDepthDebugPath(backPath, "back");
-    const std::string outLeft = makeDepthDebugPath(leftPath, "left");
-    const std::string outRight = makeDepthDebugPath(rightPath, "right");
-    const std::string outTop = makeDepthDebugPath(topPath, "top");
-
-    saveDepthDebug(outFront.c_str(), depthFront);
-    saveDepthDebug(outBack.c_str(), depthBack);
-    saveDepthDebug(outLeft.c_str(), depthLeft);
-    saveDepthDebug(outRight.c_str(), depthRight);
-    saveDepthDebug(outTop.c_str(), depthTop);
+    // 额外保存 mask 后的输入图，方便对照
+    //imwrite("outputs/input_front_masked.png", frontIn);
+    //imwrite("outputs/input_back_masked.png", backIn);
+    //imwrite("outputs/input_left_masked.png", leftIn);
+    //imwrite("outputs/input_right_masked.png", rightIn);
+    //imwrite("outputs/input_top_masked.png", topIn);
 
     initVoxel();
 
-    // 多视角体积雕刻：每视角填满深度锥 → 体素交集 → 闭合实体
-    cout << "=== Volume carving (multi-view intersection) ===" << endl;
+    // 一个通用 build 函数，按视角调用
     buildView(ViewId::Front);
-    //buildView(ViewId::Back);
-    //buildView(ViewId::Left);
-    //buildView(ViewId::Right);
-    //buildView(ViewId::Top);
+    buildView(ViewId::Back);
+    buildView(ViewId::Left);
+    buildView(ViewId::Right);
+    buildView(ViewId::Top);
 
-    // Step 3: 至少被 2 个视角同时支持（仅当实际雕刻了 ≥2 个视角）
-    if (carvedViewCount >= 2)
-        finalizeVoxelByVote(2);
+    // 用 left/right 建模后的边界约束裁剪 top 的越界体素（防止超过侧视位置）
+    // 值越大越宽松；建议 1~3
+    applySideBoundsFromLeftRight(3);
 
-    // Step 4: 邻域去孤立点（值越大去噪越强）
-    removeIsolatedVoxels(2);
+    // 清理孤立噪声点（值越大去噪越强）
+    removeIsolatedVoxels(4);
     // 去掉漂浮“成团噪声”：保留足够大的连通块（避免误删手臂等小部件）
-    //keepConnectedComponentsBySize(200, 0.03f);
+    keepConnectedComponentsBySize(200, 0.03f);
 
     cout << "Voxel Build Done" << endl;
 

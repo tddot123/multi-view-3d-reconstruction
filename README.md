@@ -1,68 +1,68 @@
 # Multi-View 3D Reconstruction and Visualization
 
-**基于深度估计的多视角三维重建与可视化系统**
+**基于深度估计的多视角三维重建与可视化系统 · 正式 v2**
 
-本项目使用 C++、OpenCV、ONNX Runtime 和 OpenGL/freeglut，从前、后、左、右、顶等视角图像估计深度，进行体素重建，并提供三维交互式可视化。
+使用 C++17、OpenCV、ONNX Runtime 和 OpenGL/freeglut，从前、后、左、右、顶视图估计相对深度，重建平滑三角网格，并提供交互查看、PLY 和多角度检查图导出。当前算法采用轴对齐、近似正交投影，尚不包含相机标定或米制重建。
 
-GitHub 仓库：`tddot123/multi-view-3d-reconstruction`。
+[仓库](https://github.com/tddot123/multi-view-3d-reconstruction) · [构建指南](docs/building.md) · [算法与运行参数](docs/usage.md) · [目录与迁移说明](docs/project-structure.md) · [版本记录](docs/releases.md) · [验证记录](docs/validation.md)
 
-## 项目内容
+## 版本
 
-- `multi-view-3d-reconstruction.sln`：Visual Studio 解决方案。
-- `openGL_enhance/multi-view-3d-reconstruction.vcxproj`：C++ 工程。
-- `openGL_enhance/v5_confidence.cpp`：当前默认程序入口，使用连续轮廓距离场、受限深度细化、平滑闭合网格及多视图纹理，支持 PLY 和多角度检查图导出。
-- `openGL_enhance/new_try.cpp`：保留的上一版主线，通过 `ReconstructionVersion=v4` 可切换回旧版。
-- `openGL_enhance/V5_NOTES.md`：新版运行参数、输出说明、验证方法和算法限制。
-- `openGL_enhance/v*.cpp` 及其他实验源码：保留的历史实验版本。
-- `openGL_enhance/input/`：多视角输入样例。
-- `openGL_enhance/test_img/`：图像与深度测试样例。
+- `codex/v1`：整理前的完整源码、文档、工程及样例快照，包含整理开始时尚未提交的 V5 工作，提交 `a32e2056d7f8a0f4b4aa3c27a774e0a72d8821c5`。
+- `codex/v2`：在上述快照基础上整理目录、修正路径和构建配置的正式版本。
+- 正式 **v1/v2** 与算法 **V4/V5** 是两套编号。正式 v1 已包含算法 V5；正式 v2 默认继续使用算法 V5，旧算法 V4 仍可选择构建。
 
-源码目录保留原名 `openGL_enhance`，解决方案、工程显示名称及仓库统一采用新名称。
-
-## 开发环境
-
-- Windows、Visual Studio 2022，安装 C++ 桌面开发组件。
-- MSVC v143、Windows SDK。
-- OpenGL、freeglut、OpenCV 4.12.0、ONNX Runtime。
-- Depth Anything V2 Large 的 ONNX 模型。
-
-现有工程在 Debug 配置中使用以下本机依赖目录；换机器后请在工程属性中调整包含目录、库目录和链接依赖：
+## 目录
 
 ```text
-D:\freeglut\include
-D:\freeglut\lib\x64
-D:\opencv\build\include
-D:\opencv\build\x64\vc16\lib
-D:\onnx\build\native\include
-D:\onnx\runtimes\win-x64\native
+src/                  当前算法与可构建的旧算法
+  reconstruction/     V5 主程序
+  legacy/             V4 兼容入口 new_try.cpp
+experiments/          单视角、多视角实验（不参与默认构建）
+archive/algorithms/   历史日期版本源码
+data/samples/         多视角图片与 RGB-D 样例
+build/vs/             Visual Studio 工程与筛选器
+config/               集中依赖配置及本机覆盖模板
+docs/                 使用、构建、版本、迁移与验证文档
+scripts/              启动与目录完整性检查工具
+models/               本地 ONNX 权重（不入 Git）
+runtime/              本地第三方 DLL（不入 Git）
+outputs/              生成结果（不入 Git）
 ```
 
-建议使用 `Debug | x64`。Release 及 Win32 配置尚需按实际依赖补齐和验证。
+根目录保留解决方案 `multi-view-3d-reconstruction.sln`。编译输出位于 `build/bin/`，中间文件位于 `build/obj/`，推理缓存位于 `.cache/`。
 
-## 编译与运行
+## 快速开始
 
-1. 打开 `multi-view-3d-reconstruction.sln`，选择 `Debug | x64`。
-2. 安装以上依赖，确认包含目录、库目录和运行时 DLL 可用。
-3. 将兼容的模型文件放置在 `openGL_enhance/model/depth_anything_v2_large.onnx`。
-4. 将运行工作目录设置为工程目录 `openGL_enhance`，确保能够读取 `input/` 和 `model/`。
-5. 创建 `openGL_enhance/output/` 目录，用于保存生成的深度图和调试结果。
-6. 编译并启动程序。当前入口读取 `input/front.png`、`back.png`、`left.png`、`right.png` 和 `top.png`。
+环境：Windows、Visual Studio 2022 的 C++ 桌面开发组件、MSVC v143、Windows SDK，以及 x64 freeglut、OpenCV 4.12.0、ONNX Runtime。
 
-请使用“文件 → 打开 → 项目/解决方案”打开 `.sln`，或在文件夹视图中双击 `.sln` 切换到解决方案视图。文件夹模式中的 `x64-Debug` 是 IntelliSense 配置，不代表 MSBuild 的实际构建平台；生成输出必须显示 `Debug x64`，不能是 `Debug Win32`。
+1. 按 [构建指南](docs/building.md) 配置依赖，将三种运行时 DLL 放入 `runtime/`。
+2. 将兼容的 Depth Anything V2 Large ONNX 放入 `models/depth_anything_v2_large.onnx`。
+3. 打开根目录 `.sln`，选择 **Debug | x64** 并生成，按 F5。工程自动将工作目录设为仓库根目录。
+4. 当前默认图片是 `data/samples/multiview/` 中的 `f04/b04/l04/r04/t04.png`，结果位于 `outputs/v5/`。
 
-本机 Debug x64 调试工作目录已设为工程目录，构建后自动将工程目录中的 FreeGLUT、OpenCV Debug 和 ONNX Runtime DLL 复制到程序输出目录。`CppProperties.json` 也配置了本机第三方头文件路径，供文件夹模式下的代码提示使用。
-
-这是实验开发项目；仓库保留现有源码与配置，不代表所有历史实验版本均已验证可运行。
-
-## 版本控制范围
-
-源码、工程配置和输入样例纳入 Git。Visual Studio 缓存、编译产物、第三方 DLL/库、ONNX 模型权重及 `output/` 生成结果由 `.gitignore` 排除，需要在本地另行准备。重命名与上传不会删除已有本地依赖或输出。
-
-## 日常提交
+在仓库根目录的 PowerShell 中也可运行：
 
 ```powershell
-git status
-git add .
-git commit -m "描述本次修改"
-git push
+# 在 VS Developer PowerShell 中编译
+msbuild .\multi-view-3d-reconstruction.sln /m /p:Configuration=Debug /p:Platform=x64
+
+# 无需 ONNX 的逻辑自检
+& .\scripts\run.ps1 --self-test
+
+# 使用默认样例与 ONNX 重建，完成后退出
+& .\scripts\run.ps1 --headless
+
+# 不加载 ONNX 的轮廓重建
+& .\scripts\run.ps1 --headless --silhouette-only --grid 64 --output-dir outputs/my-check
 ```
+
+鼠标左键旋转，滚轮缩放；`L` 切换光照，`T` 切换纹理，`R` 重置，`Esc` 退出。更多参数及算法边界见 [使用说明](docs/usage.md)。
+
+## 保留范围
+
+所有原始源码、文档、工程和 108 张样例图片均在版本历史中保留；逐文件位置映射见 [迁移清单](docs/migration-manifest.json)。原 README 与原 V5 说明还保存在 `docs/archive/`，用于核查历史描述。
+
+模型、DLL、生成结果和缓存沿用原仓库的忽略策略，本地移动后保留；旧构建产物与用户配置归档至 `archive/local-v1/`。这些本地大文件不包含在远程源码分支中，新检出时需自行准备依赖。
+
+贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。

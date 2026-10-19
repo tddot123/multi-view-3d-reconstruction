@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildThisFileDirectory)dependencies.local.props" Condition="Exists('$(MSBuildThisFileDirectory)dependencies.local.props')" />
+  <PropertyGroup>
+    <FreeglutRoot Condition="'$(FreeglutRoot)'==''">D:\freeglut</FreeglutRoot>
+    <OpenCVRoot Condition="'$(OpenCVRoot)'==''">D:\opencv\build</OpenCVRoot>
+    <OnnxRoot Condition="'$(OnnxRoot)'==''">D:\onnx</OnnxRoot>
+    <OpenCVVersion Condition="'$(OpenCVVersion)'==''">4120</OpenCVVersion>
+    <OpenCVLibraryDir Condition="'$(OpenCVLibraryDir)'==''">$(OpenCVRoot)\x64\vc16\lib</OpenCVLibraryDir>
+    <RuntimeDir Condition="'$(RuntimeDir)'==''">$(RepoRoot)runtime\</RuntimeDir>
+    <OpenCVDebugSuffix Condition="'$(Configuration)'=='Debug'">d</OpenCVDebugSuffix>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(FreeglutRoot)\include;$(OpenCVRoot)\include;$(OnnxRoot)\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(FreeglutRoot)\lib\x64;$(OpenCVLibraryDir);$(OnnxRoot)\runtimes\win-x64\native;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glu32.lib;freeglut.lib;opencv_world$(OpenCVVersion)$(OpenCVDebugSuffix).lib;onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

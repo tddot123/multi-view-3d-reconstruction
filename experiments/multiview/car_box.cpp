@@ -603,13 +603,13 @@ void reshape(int w, int h)
 
 int main(int argc, char** argv)
 {
-    frontImg = imread("./input/f0.png");
-    backImg = imread("./input/b01.png");
+    frontImg = imread("data/samples/multiview/f0.png");
+    backImg = imread("data/samples/multiview/b01.png");
 
-    leftImg = imread("./input/l01.png");
-    rightImg = imread("./ input / r01.png");
+    leftImg = imread("data/samples/multiview/l01.png");
+    rightImg = imread("data/samples/multiview/r01.png");
 
-    topImg = imread("./input/t01.png");
+    topImg = imread("data/samples/multiview/t01.png");
 
     if (frontImg.empty() ||
         leftImg.empty() ||

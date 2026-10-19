@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <FreeglutRoot>D:\freeglut</FreeglutRoot>
+    <OpenCVRoot>D:\opencv\build</OpenCVRoot>
+    <OnnxRoot>D:\onnx</OnnxRoot>
+    <OpenCVVersion>4120</OpenCVVersion>
+  </PropertyGroup>
+</Project>

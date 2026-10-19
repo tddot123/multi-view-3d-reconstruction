@@ -166,8 +166,8 @@ void motion(int x, int y) {
 int main(int argc, char** argv) {
 
     // ⭐ 注意：depth用彩色读取！
-    depthImg = cv::imread("depth4.png", cv::IMREAD_COLOR);
-    colorImg = cv::imread("color4.jpg", cv::IMREAD_COLOR);
+    depthImg = cv::imread("data/samples/rgbd/depth4.png", cv::IMREAD_COLOR);
+    colorImg = cv::imread("data/samples/rgbd/color4.jpg", cv::IMREAD_COLOR);
 
     if (depthImg.empty() || colorImg.empty()) {
         printf("Failed to load images\n");

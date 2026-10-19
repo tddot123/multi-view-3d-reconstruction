@@ -150,8 +150,8 @@ void motion(int x, int y) {
 // 主函数
 int main(int argc, char** argv) {
 
-    depthImg = cv::imread("depth4.png", cv::IMREAD_GRAYSCALE);
-    colorImg = cv::imread("color4.jpg", cv::IMREAD_COLOR);
+    depthImg = cv::imread("data/samples/rgbd/depth4.png", cv::IMREAD_GRAYSCALE);
+    colorImg = cv::imread("data/samples/rgbd/color4.jpg", cv::IMREAD_COLOR);
 
     if (depthImg.empty() || colorImg.empty()) {
         printf("Failed to load images\n");

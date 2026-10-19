@@ -2,82 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <stdio.h>
 #include <algorithm>
-#include <onnxruntime_cxx_api.h>
-cv::Mat runDepthAnything(cv::Mat& inputImg) {
 
-    try {
-
-        Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "DepthAnything");
-        Ort::SessionOptions session_options;
-        session_options.SetIntraOpNumThreads(1);
-
-        Ort::Session session(env, L"model/depth_anything_v2_large.onnx", session_options);
-
-        cv::Mat resized;
-        cv::resize(inputImg, resized, cv::Size(384, 384));
-
-        cv::cvtColor(resized, resized, cv::COLOR_BGR2RGB);
-        resized.convertTo(resized, CV_32F, 1.0 / 255.0);
-
-        std::vector<float> inputTensorValues(1 * 3 * 384 * 384);
-
-        int index = 0;
-        for (int c = 0; c < 3; c++) {
-            for (int y = 0; y < 384; y++) {
-                for (int x = 0; x < 384; x++) {
-                    inputTensorValues[index++] = resized.at<cv::Vec3f>(y, x)[c];
-                }
-            }
-        }
-
-        std::array<int64_t, 4> inputShape = { 1, 3, 384, 384 };
-
-        Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(
-            OrtArenaAllocator, OrtMemTypeDefault);
-
-        Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
-            memory_info,
-            inputTensorValues.data(),
-            inputTensorValues.size(),
-            inputShape.data(),
-            inputShape.size()
-        );
-
-        const char* input_names[] = { "pixel_values" };
-        const char* output_names[] = { "predicted_depth" };
-
-        auto outputTensors = session.Run(
-            Ort::RunOptions{ nullptr },
-            input_names,
-            &inputTensor,
-            1,
-            output_names,
-            1
-        );
-
-        float* outputData = outputTensors[0].GetTensorMutableData<float>();
-
-        auto shape = outputTensors[0].GetTensorTypeAndShapeInfo().GetShape();
-
-        int outH = shape[1];
-        int outW = shape[2];
-
-        cv::Mat depth(outH, outW, CV_32F, outputData);
-
-        cv::Mat depthNorm;
-        cv::normalize(depth, depthNorm, 0, 255, cv::NORM_MINMAX);
-        depthNorm.convertTo(depthNorm, CV_8U);
-
-        cv::Mat finalDepth;
-        cv::resize(depthNorm, finalDepth, inputImg.size());
-
-        return finalDepth.clone();
-    }
-    catch (const std::exception& e) {
-        std::cout << "ONNX Error: " << e.what() << std::endl;
-        return cv::Mat();
-    }
-}
 // 图像
 cv::Mat depthImg;
 cv::Mat colorImg;
@@ -261,61 +186,56 @@ void motion(int x, int y) {
 // 主函数
 int main(int argc, char** argv) {
 
-    colorImg = cv::imread("input/f04.png", cv::IMREAD_COLOR);
-    if (colorImg.empty()) {
-        printf("Failed to load image\n");
+    depthImg = cv::imread("data/samples/rgbd/depth4.png", cv::IMREAD_GRAYSCALE);
+    colorImg = cv::imread("data/samples/rgbd/color4.jpg", cv::IMREAD_COLOR);
+
+    if (depthImg.empty() || colorImg.empty()) {
+        printf("Failed to load images\n");
         return -1;
     }
 
-        depthImg = runDepthAnything(colorImg);
+    width = depthImg.cols;
+    height = depthImg.rows;
 
-        if (depthImg.empty() || colorImg.empty()) {
-            printf("Failed to load images\n");
-            return -1;
-        }
+    // ⭐限制最大分辨率（防卡死）
+    int maxRes = 300;
+    if (width > maxRes || height > maxRes) {
+        float scaleFactor = (float)maxRes / std::max(width, height);
+        cv::resize(depthImg, depthImg, cv::Size(), scaleFactor, scaleFactor);
+        cv::resize(colorImg, colorImg, depthImg.size());
 
         width = depthImg.cols;
         height = depthImg.rows;
+    }
 
-        // ⭐限制最大分辨率（防卡死）
-        int maxRes = 300;
-        if (width > maxRes || height > maxRes) {
-            float scaleFactor = (float)maxRes / std::max(width, height);
-            cv::resize(depthImg, depthImg, cv::Size(), scaleFactor, scaleFactor);
-            cv::resize(colorImg, colorImg, depthImg.size());
+    if (colorImg.size() != depthImg.size()) {
+        cv::resize(colorImg, colorImg, depthImg.size());
+    }
 
-            width = depthImg.cols;
-            height = depthImg.rows;
-        }
+    // ⭐自适应模型尺寸
+    float maxDim = std::max(width, height);
 
-        if (colorImg.size() != depthImg.size()) {
-            cv::resize(colorImg, colorImg, depthImg.size());
-        }
+    cubeSize = 200.0f / maxDim;   // 控制整体大小
+    heightScale = 100.0f;
 
-        // ⭐自适应模型尺寸
-        float maxDim = std::max(width, height);
+    modelSize = maxDim * cubeSize;
 
-        cubeSize = 200.0f / maxDim;   // 控制整体大小
-        heightScale = 100.0f;
+    // ⭐自动相机距离
+    distance = modelSize * 2.0f;
 
-        modelSize = maxDim * cubeSize;
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow("Voxel 3D Model (Adaptive)");
 
-        // ⭐自动相机距离
-        distance = modelSize * 2.0f;
+    init();
 
-        glutInit(&argc, argv);
-        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-        glutInitWindowSize(800, 600);
-        glutCreateWindow("Voxel 3D Model (Adaptive)");
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutIdleFunc(display);
 
-        init();
-
-        glutDisplayFunc(display);
-        glutReshapeFunc(reshape);
-        glutMouseFunc(mouse);
-        glutMotionFunc(motion);
-        glutIdleFunc(display);
-
-        glutMainLoop();
-        return 0;
-    }*/
+    glutMainLoop();
+    return 0;
+}*/
