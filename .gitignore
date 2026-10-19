@@ -11,6 +11,7 @@
 x64/
 x86/
 ipch/
+.build/
 *.obj
 *.pdb
 *.ilk

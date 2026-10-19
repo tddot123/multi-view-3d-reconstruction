@@ -57,6 +57,9 @@
     <ClCompile Include="new_try.cpp">
       <Filter>源文件\try</Filter>
     </ClCompile>
+    <ClCompile Include="v5_confidence.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="v4_5.26.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

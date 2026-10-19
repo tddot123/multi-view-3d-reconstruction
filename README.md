@@ -10,7 +10,9 @@ GitHub 仓库：`tddot123/multi-view-3d-reconstruction`。
 
 - `multi-view-3d-reconstruction.sln`：Visual Studio 解决方案。
 - `openGL_enhance/multi-view-3d-reconstruction.vcxproj`：C++ 工程。
-- `openGL_enhance/new_try.cpp`：当前启用的程序入口，包含多视角深度估计与体素重建流程。
+- `openGL_enhance/v5_confidence.cpp`：当前默认程序入口，使用连续轮廓距离场、受限深度细化、平滑闭合网格及多视图纹理，支持 PLY 和多角度检查图导出。
+- `openGL_enhance/new_try.cpp`：保留的上一版主线，通过 `ReconstructionVersion=v4` 可切换回旧版。
+- `openGL_enhance/V5_NOTES.md`：新版运行参数、输出说明、验证方法和算法限制。
 - `openGL_enhance/v*.cpp` 及其他实验源码：保留的历史实验版本。
 - `openGL_enhance/input/`：多视角输入样例。
 - `openGL_enhance/test_img/`：图像与深度测试样例。
@@ -45,6 +47,10 @@ D:\onnx\runtimes\win-x64\native
 4. 将运行工作目录设置为工程目录 `openGL_enhance`，确保能够读取 `input/` 和 `model/`。
 5. 创建 `openGL_enhance/output/` 目录，用于保存生成的深度图和调试结果。
 6. 编译并启动程序。当前入口读取 `input/front.png`、`back.png`、`left.png`、`right.png` 和 `top.png`。
+
+请使用“文件 → 打开 → 项目/解决方案”打开 `.sln`，或在文件夹视图中双击 `.sln` 切换到解决方案视图。文件夹模式中的 `x64-Debug` 是 IntelliSense 配置，不代表 MSBuild 的实际构建平台；生成输出必须显示 `Debug x64`，不能是 `Debug Win32`。
+
+本机 Debug x64 调试工作目录已设为工程目录，构建后自动将工程目录中的 FreeGLUT、OpenCV Debug 和 ONNX Runtime DLL 复制到程序输出目录。`CppProperties.json` 也配置了本机第三方头文件路径，供文件夹模式下的代码提示使用。
 
 这是实验开发项目；仓库保留现有源码与配置，不代表所有历史实验版本均已验证可运行。
 

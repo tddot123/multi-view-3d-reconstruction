@@ -71,6 +71,10 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <ReconstructionVersion Condition="'$(ReconstructionVersion)'==''">v5</ReconstructionVersion>
+    <IntDir>$(ProjectDir).build\$(ProjectName)\$(Platform)\$(Configuration)\$(ReconstructionVersion)\</IntDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -109,6 +113,7 @@ freeglut.lib;opencv_world4120d.lib;onnxruntime.lib</AdditionalDependencies>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>D:\freeglut\include;D:\opencv\build\include;D:\onnx\build\native\include</AdditionalIncludeDirectories>
     </ClCompile>
@@ -144,7 +149,12 @@ freeglut.lib;opencv_world4120d.lib;onnxruntime.lib</AdditionalDependencies>
     <ClCompile Include="car_box.cpp" />
     <ClCompile Include="copy.cpp" />
     <ClCompile Include="front_success.cpp" />
-    <ClCompile Include="new_try.cpp" />
+    <ClCompile Include="new_try.cpp">
+      <ExcludedFromBuild Condition="'$(ReconstructionVersion)'!='v4'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="v5_confidence.cpp">
+      <ExcludedFromBuild Condition="'$(ReconstructionVersion)'!='v5'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="test.cpp" />
     <ClCompile Include="try_depth_range.cpp" />
     <ClCompile Include="v1_4.15.cpp" />
@@ -153,6 +163,19 @@ freeglut.lib;opencv_world4120d.lib;onnxruntime.lib</AdditionalDependencies>
     <ClCompile Include="v4_5.26.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CheckSupportedPlatform" BeforeTargets="PrepareForBuild" Condition="'$(Platform)'=='Win32'">
+    <Error Text="This project uses x64 third-party libraries. Select Debug | x64 in Visual Studio's solution configuration." />
+  </Target>
+  <Target Name="CheckReconstructionVersion" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(ReconstructionVersion)'!='v4' And '$(ReconstructionVersion)'!='v5'" Text="ReconstructionVersion must be v4 or v5." />
+  </Target>
+  <Target Name="PrepareDebugRuntime" AfterTargets="Build" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ItemGroup>
+      <DebugRuntimeDll Include="$(ProjectDir)freeglut.dll;$(ProjectDir)opencv_world4120d.dll;$(ProjectDir)onnxruntime.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DebugRuntimeDll)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <MakeDir Directories="$(ProjectDir)output" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
